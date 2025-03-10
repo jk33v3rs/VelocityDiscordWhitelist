@@ -101,7 +101,7 @@ public class VelocityWhitelist {
     @Subscribe
     public void onProxyInitialization(ProxyInitializeEvent event) {
         try {
-            int pluginId = 20846;
+            int pluginId = 25057;
             Metrics metrics = metricsFactory.make(this, pluginId);
 
             CommandManager commandManager = server.getCommandManager();
@@ -118,6 +118,19 @@ public class VelocityWhitelist {
                 server.getScheduler().buildTask(this, this::createDatabaseTable).schedule();
             }
 
+            /*** SAMPLE LOGO 
+             *     __   __ __      __  _    
+             *     \ \ / / \ \    / / | |     Velocity Whitelist
+             *      \ V /   \ \/\/ /  | |__   v 1.0.0
+             *       \_/     \_/\_/   |____|  Built on 2021-09-30
+             *                              
+             */
+
+            logger.info(" __   __ __      __  _    ");
+            logger.info(" \\\\ \\ / / \\\\ \\    / / | |     {} ", BuildConstants.NAME);
+            logger.info("  \\ V /   \\\\ \\/\\/ /  | |__   v {} ", BuildConstants.VERSION);
+            logger.info("   \\_/     \\_/\\_/   |____|  Built on {} ", BuildConstants.BUILD_DATE);
+            logger.info(" ");
             logger.info("{} {} loaded successfully!", BuildConstants.NAME, BuildConstants.VERSION);
         } catch (Exception e) {
             logger.error("Error during plugin initialization", e);
@@ -162,11 +175,11 @@ public class VelocityWhitelist {
 
                     # MySQL settings
                     host: localhost
-                    user: root
-                    password: example
-                    database: minecraft
+                    user: username
+                    password: strongpassword
+                    database: velocity
                     port: 3306
-                    table: mysql_whitelist
+                    table: g_whitelist
                                         
                     # Kick message
                     message: Sorry, you are not in the whitelist.
@@ -458,7 +471,14 @@ public class VelocityWhitelist {
      */
     @Subscribe
     public void onPlayerLogin(LoginEvent event) {
+        // Validate that the player object is not null
         Player player = event.getPlayer();
+        if (player == null) {
+            logger.error("LoginEvent triggered with a null player.");
+            return;
+        }
+
+        // Check if the whitelist is enabled and if the player is not whitelisted
         if (Boolean.parseBoolean(config.getProperty("enabled")) && !this.isWhitelisted(player)) {
             Component kickMessage = Component.text(config.getProperty("message"));
             event.setResult(ComponentResult.denied(kickMessage));

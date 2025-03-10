@@ -20,12 +20,12 @@ enabled: false
 
 # MySQL settings
 host: localhost
-user: root
-password: example
-database: minecraft
+user: username
+password: strongpassword
+database: velocity
 port: 3306
-table: mysql_whitelist
-
+table: g_whitelist
+                    
 # Kick message
 message: Sorry, you are not in the whitelist.
 ```
@@ -53,6 +53,8 @@ message: Sorry, you are not in the whitelist.
 
 ## Issues and Contributions
 
+[![forthebadge](https://forthebadge.com/images/badges/works-on-my-machine.svg)](https://forthebadge.com)
+
 If you encounter any issues or have suggestions for improvement, please open an issue or submit a pull request on the [GitHub repository](https://github.com/rathinosk/VelocityWhitelist).
 
 ## License
@@ -61,4 +63,4 @@ This plugin is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) f
 
 ## bStats
 
-[![metrics](https://bstats.org/signatures/velocity/VelocityWhitelist.svg)](https://bstats.org/plugin/velocity/VelocityWhitelist/20846)
+[![metrics](https://bstats.org/signatures/velocity/VelocityWhitelist.svg)](https://bstats.org/plugin/velocity/VelocityWhitelist/25057)
