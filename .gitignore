@@ -118,5 +118,4 @@ run/
 !gradle-wrapper.jar
 
 # Other files and directories to ignore
-.vscode/
 .out/
