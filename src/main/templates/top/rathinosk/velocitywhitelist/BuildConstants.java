@@ -1,6 +1,9 @@
 package top.rathinosk.velocitywhitelist;
 
-// The constants are replaced before compilation
+/**
+ * BuildConstants class stores constants that are replaced before compilation.
+ * These constants provide information about the plugin, such as its ID, name, version, URL, description, and authors.
+ */
 public class BuildConstants {
 
     public static final String ID = "${id}";

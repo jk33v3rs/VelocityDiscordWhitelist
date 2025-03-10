@@ -24,6 +24,8 @@ import org.slf4j.Logger;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,6 +34,11 @@ import java.sql.*;
 import java.util.Properties;
 import java.util.UUID;
 
+/**
+ * The main class for the VelocityWhitelist plugin.
+ * This class handles plugin initialization, command registration,
+ * configuration loading, and whitelist management.
+ */
 @Plugin(
         id = BuildConstants.ID,
         name = BuildConstants.NAME,
@@ -49,6 +56,14 @@ public class VelocityWhitelist {
     private Properties config;
     private final Metrics.Factory metricsFactory;
 
+    /**
+     * Constructor for the VelocityWhitelist plugin.
+     *
+     * @param server         The ProxyServer instance.
+     * @param logger         The Logger instance.
+     * @param dataDirectory  The plugin's data directory.
+     * @param metricsFactory The Metrics.Factory instance.
+     */
     @Inject
     public VelocityWhitelist(
             ProxyServer server,
@@ -64,6 +79,10 @@ public class VelocityWhitelist {
         new org.mariadb.jdbc.Driver();
     }
 
+    /**
+     * Closes the database connection.
+     * This method is synchronized to prevent concurrent access issues.
+     */
     public static synchronized void closeConnection() {
         try {
             connection.close();
@@ -72,6 +91,13 @@ public class VelocityWhitelist {
         }
     }
 
+    /**
+     * Event listener for the ProxyInitializeEvent.
+     * This method is called when the proxy server is initialized.
+     * It registers commands, loads the configuration, and creates the database table.
+     *
+     * @param event The ProxyInitializeEvent.
+     */
     @Subscribe
     public void onProxyInitialization(ProxyInitializeEvent event) {
         try {
@@ -98,6 +124,11 @@ public class VelocityWhitelist {
         }
     }
 
+    /**
+     * Creates the database table if it doesn't exist.
+     * This method opens a connection to the database, executes the SQL query,
+     * and then closes the connection.
+     */
     private void createDatabaseTable() {
         openConnection();
 
@@ -111,6 +142,11 @@ public class VelocityWhitelist {
         }
     }
 
+    /**
+     * Saves the default configuration file if it doesn't exist.
+     * This method creates the data directory if it doesn't exist,
+     * and then writes the default configuration content to the config file.
+     */
     public void saveDefaultConfig() {
         if (Files.notExists(dataDirectory)) {
             try {
@@ -144,6 +180,12 @@ public class VelocityWhitelist {
 
     }
 
+    /**
+     * Loads the configuration from the config file.
+     * This method reads the config file and loads the properties into a Properties object.
+     *
+     * @return The Properties object containing the configuration.
+     */
     private Properties loadConfig() {
         Properties properties = new Properties();
 
@@ -159,14 +201,25 @@ public class VelocityWhitelist {
         return properties;
     }
 
-    //    private void saveConfig(Properties properties) {
-//        try (OutputStream output = Files.newOutputStream(configFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
-//            OutputStreamWriter writer = new OutputStreamWriter(output,StandardCharsets.UTF_8);
-//            properties.store(writer, "Updated Configuration");
-//        } catch (IOException e) {
-//            throw new RuntimeException("Error while saving configuration", e);
-//        }
-//    }
+    /**
+     * Saves the configuration to the config file.
+     * This method writes the properties to the config file.
+     * @param properties The Properties object containing the configuration to save.
+     */
+    private void saveConfig(Properties properties) {
+       try (OutputStream output = Files.newOutputStream(configFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+           OutputStreamWriter writer = new OutputStreamWriter(output,StandardCharsets.UTF_8);
+           properties.store(writer, "Updated Configuration");
+       } catch (IOException e) {
+           throw new RuntimeException("Error while saving configuration", e);
+       }
+   }
+
+    /**
+     * Opens a connection to the MySQL database.
+     * This method uses the configuration properties to establish a connection.
+     * This method is synchronized to prevent concurrent access issues.
+     */
     public synchronized void openConnection() {
         try {
             connection = DriverManager.getConnection("jdbc:mysql://" + config.getProperty("host") + ":" + config.getProperty("port") + "/" + config.getProperty("database") + "?useSSL=false", config.getProperty("user"), config.getProperty("password"));
@@ -175,6 +228,14 @@ public class VelocityWhitelist {
         }
     }
 
+    /**
+     * Adds a player to the whitelist.
+     * This method opens a connection to the database, executes the SQL query,
+     * and then closes the connection.
+     *
+     * @param source The CommandSource who executed the command.
+     * @param player The name of the player to add to the whitelist.
+     */
     public void addWhitelist(CommandSource source, String player) {
         this.openConnection();
 
@@ -200,6 +261,14 @@ public class VelocityWhitelist {
 
     }
 
+    /**
+     * Deletes a player from the whitelist.
+     * This method opens a connection to the database, executes the SQL query,
+     * and then closes the connection.
+     *
+     * @param source The CommandSource who executed the command.
+     * @param player The name of the player to delete from the whitelist.
+     */
     public void delWhitelist(CommandSource source, String player) {
         this.openConnection();
 
@@ -217,6 +286,12 @@ public class VelocityWhitelist {
 
     }
 
+    /**
+     * Creates a BrigadierCommand for the whitelist command.
+     * This method defines the command structure and its execution logic.
+     *
+     * @return The BrigadierCommand instance.
+     */
     public BrigadierCommand createBrigadierCommand() {
         LiteralCommandNode<CommandSource> helloNode = BrigadierCommand.literalArgumentBuilder("mywl")
                 .requires(source -> source.hasPermission("mysqlwhitelist"))
@@ -234,30 +309,52 @@ public class VelocityWhitelist {
                                 .executes(context -> {
                                     CommandSource source = context.getSource();
                                     String[] arguments = context.getArgument("argument", String.class).split(" ");
+
+                                    // Check if the command has only one argument
                                     if (arguments.length == 1) {
+                                        
+                                        // Handle 'add' command with missing player name
                                         if (arguments[0].equals("add")) {
                                             sendUsageMessage(source, "add");
+                                        
+                                        // Handle 'del' command with missing player name
                                         } else if (arguments[0].equals("del")) {
                                             sendUsageMessage(source, "del");
-//                                } else if (arguments[0].equals("on")) {
-//                                    config.setProperty("enabled", String.valueOf(true));
-//                                    saveConfig(config);
-//                                    source.sendMessage(Component.text("Whitelist enabled", NamedTextColor.GREEN));
-//                                } else if (arguments[0].equals("off")) {
-//                                    config.setProperty("enabled", String.valueOf(false));
-//                                    saveConfig(config);
-//                                    source.sendMessage(Component.text("Whitelist disabled", NamedTextColor.AQUA));
+                                        
+                                        // Handle 'on' command to enable the whitelist
+                                        } else if (arguments[0].equals("on")) {
+                                            config.setProperty("enabled", String.valueOf(true));
+                                            saveConfig(config);
+                                            source.sendMessage(Component.text("Whitelist enabled", NamedTextColor.GREEN));
+                                        
+                                        // Handle 'off' command to disable the whitelist
+                                        } else if (arguments[0].equals("off")) {
+                                            config.setProperty("enabled", String.valueOf(false));
+                                            saveConfig(config);
+                                            source.sendMessage(Component.text("Whitelist disabled", NamedTextColor.AQUA));
+                                        
+                                        // Handle unknown command
                                         } else {
                                             sendUsageMessage(source, "all");
                                         }
+
+                                      // Check if the command has two arguments
                                     } else if (arguments.length == 2) {
+                                        
+                                        // Handle 'add' command with player name
                                         if (arguments[0].equals("add")) {
                                             addWhitelist(source, arguments[1]);
+                                        
+                                        // Handle 'del' command with player name
                                         } else if (arguments[0].equals("del")) {
                                             delWhitelist(source, arguments[1]);
+                                        
+                                        // Handle unknown command
                                         } else {
                                             sendUsageMessage(source, "all");
                                         }
+
+                                    // Handle incorrect number of arguments
                                     } else {
                                         sendUsageMessage(source, "all");
                                     }
@@ -269,10 +366,17 @@ public class VelocityWhitelist {
         return new BrigadierCommand(helloNode);
     }
 
+    /**
+     * Sends a usage message to the command source.
+     * This method constructs a message based on the specified subcommand.
+     *
+     * @param source      The CommandSource to send the message to.
+     * @param subcommand  The subcommand for which to display usage.
+     */
     public void sendUsageMessage(CommandSource source, String subcommand) {
         String usage = switch (subcommand) {
-//            case "all" -> "/mywl add/del/on/off <player>";
-            case "all" -> "/mywl add/del <player>";
+            case "all" -> "/mywl add/del/on/off <player>";
+//            case "all" -> "/mywl add/del <player>";
             case "add" -> "/mywl add <player>";
             case "del" -> "/mywl del <player>";
             default -> "";
@@ -285,6 +389,13 @@ public class VelocityWhitelist {
         }
     }
 
+    /**
+     * Checks if a player is whitelisted.
+     * This method queries the database to determine if the player is in the whitelist.
+     *
+     * @param player The Player to check.
+     * @return True if the player is whitelisted, false otherwise.
+     */
     public boolean isWhitelisted(Player player) {
         try {
             openConnection();
@@ -338,6 +449,13 @@ public class VelocityWhitelist {
         return true;
     }
 
+    /**
+     * Event listener for the LoginEvent.
+     * This method is called when a player attempts to log in.
+     * It checks if the player is whitelisted and denies the connection if they are not.
+     *
+     * @param event The LoginEvent.
+     */
     @Subscribe
     public void onPlayerLogin(LoginEvent event) {
         Player player = event.getPlayer();
