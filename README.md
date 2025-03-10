@@ -4,7 +4,7 @@ This is a Velocity plugin for managing a Minecraft whitelist using MySQL as the 
 
 ## Installation
 
-1. Download the latest release from the [Releases](https://github.com/moesnow/VelocityWhitelist/releases) page.
+1. Download the latest release from the [Releases](https://github.com/rathinosk/VelocityWhitelist/releases) page.
 2. Place the JAR file in the `plugins` directory of your Velocity proxy.
 3. Start the proxy.
 
@@ -53,7 +53,7 @@ message: Sorry, you are not in the whitelist.
 
 ## Issues and Contributions
 
-If you encounter any issues or have suggestions for improvement, please open an issue or submit a pull request on the [GitHub repository](https://github.com/moesnow/VelocityWhitelist).
+If you encounter any issues or have suggestions for improvement, please open an issue or submit a pull request on the [GitHub repository](https://github.com/rathinosk/VelocityWhitelist).
 
 ## License
 

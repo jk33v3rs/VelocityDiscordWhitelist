@@ -13,8 +13,8 @@ repositories {
 }
 
 dependencies {
-    compileOnly 'com.velocitypowered:velocity-api:3.3.0-SNAPSHOT'
-    annotationProcessor 'com.velocitypowered:velocity-api:3.3.0-SNAPSHOT'
+    compileOnly 'com.velocitypowered:velocity-api:3.4.0-SNAPSHOT'
+    annotationProcessor 'com.velocitypowered:velocity-api:3.4.0-SNAPSHOT'
     implementation 'org.mariadb.jdbc:mariadb-java-client:2.7.11'
     implementation 'org.bstats:bstats-velocity:3.0.2'
 }
@@ -52,9 +52,9 @@ def generateTemplates = tasks.register('generateTemplates', Copy) { task ->
             'id'         : "velocitywhitelist",
             'name'       : project.name,
             'version'    : project.version,
-            'link'       : "https://github.com/moesnow/VelocityWhitelist",
+            'link'       : "https://github.com/rathinosk/VelocityWhitelist",
             'description': project.description,
-            'authors'    : "moesnow"
+            'authors'    : "rathinosk"
     ]
     task.inputs.properties props
 
