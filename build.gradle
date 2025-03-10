@@ -10,21 +10,37 @@ repositories {
         name = 'papermc'
         url = 'https://repo.papermc.io/repository/maven-public/'
     }
+    mavenCentral() // Add Maven Central as a fallback repository
+}
+
+configurations {
+    shadowImplementation {
+        canBeResolved = true
+        canBeConsumed = false
+        extendsFrom configurations.implementation
+    }
 }
 
 dependencies {
     compileOnly 'com.velocitypowered:velocity-api:3.4.0-SNAPSHOT'
     annotationProcessor 'com.velocitypowered:velocity-api:3.4.0-SNAPSHOT'
-    implementation 'org.mariadb.jdbc:mariadb-java-client:3.5.2'
+    implementation 'org.mariadb.jdbc:mariadb-java-client:2.7.12'
     implementation 'org.bstats:bstats-velocity:3.1.0'
 }
 
 shadowJar {
     relocate 'org.bstats', 'top.rathinosk.velocitywhitelist'
+    configurations = [project.configurations.shadowImplementation]
+    mergeServiceFiles()
+    transform(com.github.jengelman.gradle.plugins.shadow.transformers.ServiceFileTransformer)
+    // Ensure all dependencies are included in the shadow JAR
+    dependencies {
+        include(dependency('org.mariadb.jdbc:mariadb-java-client:2.7.12'))
+    }
 }
 
 group = 'top.rathinosk'
-version = '1.2.0'
+version = '1.2.6'
 description = 'Velocity plugin for managing a Minecraft whitelist using MySQL'
 
 def targetJavaVersion = 17
@@ -65,5 +81,5 @@ def generateTemplates = tasks.register('generateTemplates', Copy) { task ->
 
 sourceSets.main.java.srcDir(generateTemplates.map { it.outputs })
 
-rootProject.idea.project.settings.taskTriggers.afterSync generateTemplates
-project.eclipse.synchronizationTasks(generateTemplates)
+idea.project.settings.taskTriggers.afterSync(generateTemplates)
+tasks.named("eclipse") { it.dependsOn(generateTemplates) }
