@@ -1,4 +1,4 @@
-package top.kotori.mysqlwhitelistvelocity;
+package top.rathinosk.velocitywhitelist;
 
 import com.google.inject.Inject;
 import com.mojang.brigadier.Command;
@@ -40,7 +40,7 @@ import java.util.UUID;
         description = BuildConstants.DESCRIPTION,
         authors = BuildConstants.AUTHORS
 )
-public class MySQLWhitelistVelocity {
+public class VelocityWhitelist {
     public static Connection connection;
     private final ProxyServer server;
     private final Logger logger;
@@ -50,7 +50,7 @@ public class MySQLWhitelistVelocity {
     private final Metrics.Factory metricsFactory;
 
     @Inject
-    public MySQLWhitelistVelocity(
+    public VelocityWhitelist(
             ProxyServer server,
             Logger logger,
             @DataDirectory Path dataDirectory,

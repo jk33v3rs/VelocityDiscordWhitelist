@@ -20,10 +20,10 @@ dependencies {
 }
 
 shadowJar {
-    relocate 'org.bstats', 'top.kotori.mysqlwhitelistvelocity'
+    relocate 'org.bstats', 'top.rathinosk.velocitywhitelist'
 }
 
-group = 'top.kotori'
+group = 'top.rathinosk'
 version = '1.2.0'
 description = 'Velocity plugin for managing a Minecraft whitelist using MySQL'
 
@@ -49,10 +49,10 @@ def templateSource = file('src/main/templates')
 def templateDest = layout.buildDirectory.dir('generated/sources/templates')
 def generateTemplates = tasks.register('generateTemplates', Copy) { task ->
     def props = [
-            'id'         : "mysqlwhitelistvelocity",
+            'id'         : "velocitywhitelist",
             'name'       : project.name,
             'version'    : project.version,
-            'link'       : "https://github.com/moesnow/MySQLWhitelistVelocity",
+            'link'       : "https://github.com/moesnow/VelocityWhitelist",
             'description': project.description,
             'authors'    : "moesnow"
     ]

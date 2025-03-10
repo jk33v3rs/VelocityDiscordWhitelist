@@ -1,26 +1,24 @@
 # MySQL Whitelist Velocity
 
-**简体中文** | [English](./README_EN.md)
+This is a Velocity plugin for managing a Minecraft whitelist using MySQL as the backend storage.
 
-这是一个使用 MySQL 作为后端存储的 Velocity 插件，用于管理 Minecraft 白名单。
+## Installation
 
-## 安装
+1. Download the latest release from the [Releases](https://github.com/moesnow/VelocityWhitelist/releases) page.
+2. Place the JAR file in the `plugins` directory of your Velocity proxy.
+3. Start the proxy.
 
-1. 从 [Releases](https://github.com/moesnow/MySQLWhitelistVelocity/releases) 页面下载最新版本。
-2. 将 JAR 文件放置在 Velocity 代理的 `plugins` 目录中。
-3. 启动代理。
+## Configuration
 
-## 配置
+The plugin uses a configuration file (`config.properties`) located in the `plugins/velocitywhitelist` directory.
 
-插件使用位于 `plugins/mysqlwhitelistvelocity` 目录中的 `config.properties` 文件进行配置。
-
-### 默认配置
+### Default Configuration
 
 ```properties
-# 白名单状态
+# Whitelist Status
 enabled: false
 
-# MySQL 设置
+# MySQL settings
 host: localhost
 user: root
 password: example
@@ -28,39 +26,39 @@ database: minecraft
 port: 3306
 table: mysql_whitelist
 
-# 踢出消息
+# Kick message
 message: Sorry, you are not in the whitelist.
 ```
 
-### 配置选项
+### Configuration Options
 
-- `enabled`: 设置为 `true` 以启用白名单。
-- `host`, `user`, `password`, `database`, `port`, `table`: MySQL 数据库连接详情。
-- `message`: 显示给不在白名单中的玩家的踢出消息。
+- `enabled`: Set to `true` to enable the whitelist.
+- `host`, `user`, `password`, `database`, `port`, `table`: MySQL database connection details.
+- `message`: Kick message displayed to players not in the whitelist.
 
-## 命令
+## Commands
 
-- `/mywl add <player>`: 将玩家添加到白名单。
-- `/mywl del <player>`: 从白名单中移除玩家。
+- `/mywl add <player>`: Add a player to the whitelist.
+- `/mywl del <player>`: Remove a player from the whitelist.
 
-## 权限
+## Permissions
 
-- `mysqlwhitelist`: 使用白名单管理命令所需的权限。
+- `mysqlwhitelist`: Required to use whitelist management commands.
 
-## 使用方法
+## Usage
 
-1. 在 `config.properties` 文件中配置 MySQL 连接详情。
-2. 启动代理。
-3. 使用 `/mywl` 命令管理白名单。
+1. Configure the MySQL connection details in the `config.properties` file.
+2. Start the proxy.
+3. Use the `/mywl` command to manage the whitelist.
 
-## 问题和贡献
+## Issues and Contributions
 
-如果遇到任何问题或有改进建议，请在 [GitHub 仓库](https://github.com/moesnow/MySQLWhitelistVelocity)上提出问题或提交拉取请求。
+If you encounter any issues or have suggestions for improvement, please open an issue or submit a pull request on the [GitHub repository](https://github.com/moesnow/VelocityWhitelist).
 
-## 许可
+## License
 
-此插件采用 GPL-3.0 许可证授权 - 有关详细信息，请参阅 [LICENSE](LICENSE) 文件。
+This plugin is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) file for details.
 
 ## bStats
 
-[![metrics](https://bstats.org/signatures/velocity/MySQLWhitelistVelocity.svg)](https://bstats.org/plugin/velocity/MySQLWhitelistVelocity/20846)
+[![metrics](https://bstats.org/signatures/velocity/VelocityWhitelist.svg)](https://bstats.org/plugin/velocity/VelocityWhitelist/20846)

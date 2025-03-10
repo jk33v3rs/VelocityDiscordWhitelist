@@ -1,4 +1,4 @@
-package top.kotori.mysqlwhitelistvelocity;
+package top.rathinosk.velocitywhitelist;
 
 // The constants are replaced before compilation
 public class BuildConstants {
