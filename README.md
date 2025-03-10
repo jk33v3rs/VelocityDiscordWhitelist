@@ -1,12 +1,14 @@
-# MySQL Whitelist Velocity
+# Velocity Whitelist
 
-This is a Velocity plugin for managing a Minecraft whitelist using MySQL as the backend storage.
+This is a Velocity plugin designed to manage a Minecraft whitelist using MySQL/MariaDB as the backend storage. Unable to find a plugin that met my exact requirements, I decided to adapt this one to suit my needs.
+
+The project is based on [MySQLWhitelistVelocity by moesnow](https://github.com/moesnow/MySQLWhitelistVelocity) version 1.2.0.
 
 ## Installation
 
 1. Download the latest release from the [Releases](https://github.com/rathinosk/VelocityWhitelist/releases) page.
 2. Place the JAR file in the `plugins` directory of your Velocity proxy.
-3. Start the proxy.
+3. Start or Restart the proxy.
 
 ## Configuration
 
@@ -38,6 +40,8 @@ message: Sorry, you are not in the whitelist.
 
 ## Commands
 
+- `/mywl on`: Turn ON the whitelist.
+- `/mywl off`: Turn OFF the whitelist.
 - `/mywl add <player>`: Add a player to the whitelist.
 - `/mywl del <player>`: Remove a player from the whitelist.
 
