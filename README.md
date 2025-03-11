@@ -43,11 +43,11 @@ message: Sorry, you are not in the whitelist.
 
 ## Commands
 
-- `/velw enable`: Enable the whitelist.
-- `/velw disable`: Disable the whitelist.
-- `/velw add <player>`: Add a player to the whitelist.
-- `/velw del <player>`: Remove a player from the whitelist.
-- `/velw debug <on/off>`: Turn debug messages on or off
+- `/vwl enable`: Enable the whitelist.
+- `/vwl disable`: Disable the whitelist.
+- `/vwl add <player>`: Add a player to the whitelist.
+- `/vwl del <player>`: Remove a player from the whitelist.
+- `/vwl debug <on/off>`: Turn debug messages on or off
 
 ## Permissions
 
@@ -57,7 +57,7 @@ message: Sorry, you are not in the whitelist.
 
 1. Configure the MySQL connection details in the `config.properties` file.
 2. Start the proxy.
-3. Use the `/velw` command to manage the whitelist.
+3. Use the `/vwl` command to manage the whitelist.
 
 ## Issues and Contributions
 

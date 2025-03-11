@@ -137,7 +137,7 @@ public class VelocityWhitelist {
 
             // Register the whitelist command
             CommandManager commandManager = server.getCommandManager();
-            CommandMeta commandMeta = commandManager.metaBuilder("velw")
+            CommandMeta commandMeta = commandManager.metaBuilder("vwl")
                     .plugin(this)
                     .build();
             BrigadierCommand commandToRegister = this.createBrigadierCommand();
@@ -338,6 +338,79 @@ public class VelocityWhitelist {
     }
 
     /**
+     * Lists all whitelisted players that match a case-insensitive search.
+     * The search string must be at least 2 characters long.
+     *
+     * @param source The CommandSource who executed the command.
+     * @param search The search string to match against player names.
+     */
+    public void listWhitelist(CommandSource source, String search) {
+        debugLog("Listing whitelisted players matching: " + search);
+
+        // Preliminary check to make sure the search string is at least 2 characters long
+        if (search.length() < 2) {
+            source.sendMessage(Component.text("Search string must be at least 2 characters long.", NamedTextColor.RED));
+            return;
+        }
+
+        // Sanitize the search string to prevent SQL injection
+        String sanitizedSearch = search.replaceAll("[^a-zA-Z0-9]", "");
+        Boolean isValid = true;
+
+        // Check if the sanitized string is still valid
+        if (sanitizedSearch !=  search) {
+            String outMsg = "Invalid characters in search string.";
+
+            if (sanitizedSearch.length() < 2) {
+                outMsg += " Not enough usable characters.";
+                isValid = false;
+            }
+            if (sanitizedSearch.isEmpty()) {
+                outMsg += " No usable characters found.";
+                isValid = false;
+            } 
+            source.sendMessage( Component.text(outMsg, NamedTextColor.RED));
+            // Exit if the search string is invalid
+            if (!isValid) {return;}
+        }
+
+        openConnection();
+
+        try {
+            String sqlQuery = "SELECT `user` FROM `" + config.getProperty("table") + "` WHERE `user` LIKE ?;";
+            try (PreparedStatement sql = connection.prepareStatement(sqlQuery)) {
+                sql.setString(1, "%" + sanitizedSearch + "%");
+                try (ResultSet rs = sql.executeQuery()) {
+                    Component message = Component.text("Whitelisted Players matching '" + search + "':", NamedTextColor.GREEN);
+                    boolean found = false;
+                    StringBuilder playerList = new StringBuilder();
+                    int count = 0;
+                    // intentionally limit to 20 results
+                    while (rs.next() && count < 20) {
+                        found = true;
+                        String username = rs.getString("user");
+                        playerList.append(username).append(", ");
+                        count++;
+                    }
+                    if (found) {
+                        // Remove the trailing comma and space
+                        playerList.delete(playerList.length() - 2, playerList.length());
+                        message = message.append(Component.text(" " + playerList.toString(), NamedTextColor.WHITE));
+                    } else {
+                        message = Component.text("No whitelisted players found matching '" + search + "'.", NamedTextColor.RED);
+                    }
+                    source.sendMessage(message);
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Error while listing whitelisted players", e);
+            source.sendMessage(Component.text("An error occurred while listing whitelisted players.", NamedTextColor.RED));
+        } finally {
+            closeConnection();
+        }
+    }
+
+    /**
      * Creates a BrigadierCommand for the whitelist command.
      * This method defines the command structure and its execution logic.
      *
@@ -347,7 +420,7 @@ public class VelocityWhitelist {
 
         debugLog("Creating Brigadier command");
 
-        LiteralCommandNode<CommandSource> helloNode = BrigadierCommand.literalArgumentBuilder("velw")
+        LiteralCommandNode<CommandSource> helloNode = BrigadierCommand.literalArgumentBuilder("vwl")
                 .requires(source -> source.hasPermission("velocitywhitelist"))
                 .executes(context -> {
                     CommandSource source = context.getSource();
@@ -418,6 +491,10 @@ public class VelocityWhitelist {
                                                 sendUsageMessage(source, "debug");
                                             }
                                         
+                                        // Handle 'list' command with search term
+                                        } else if (arguments[0].equals("list")) {
+                                            listWhitelist(source, arguments[1]);
+                                        
                                         // Handle unknown command
                                         } else {
                                             sendUsageMessage(source, "all");
@@ -461,10 +538,10 @@ public class VelocityWhitelist {
         debugLog("Sending usage message for " + subcommand);
 
         String usage = switch (subcommand) {
-            case "all" -> "/velw add/del <player> | enable/disable | debug <on/off>";
-            case "add" -> "/velw add <player>";
-            case "del" -> "/velw del <player>";
-            case "debug" -> "/velw debug <on/off>";
+            case "all" -> "/vwl add/del <player> | enable/disable | debug <on/off>";
+            case "add" -> "/vwl add <player>";
+            case "del" -> "/vwl del <player>";
+            case "debug" -> "/vwl debug <on/off>";
             default -> "";
         };
 
