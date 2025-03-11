@@ -51,6 +51,7 @@ public class VelocityWhitelist {
     public static Connection connection;
     private final ProxyServer server;
     private final Logger logger;
+    private Boolean debugEnabled = false;
     private final Path dataDirectory;
     private final Path configFile;
     private Properties config;
@@ -80,6 +81,17 @@ public class VelocityWhitelist {
     }
 
     /**
+     * Prints a debug message to the console if debugEnabled is true.
+     * 
+     * @param message The message to log.
+     */
+    public void debugLog(String message) {
+        if (debugEnabled) {
+            logger.info("[DEBUG] " + message);
+        }
+    }
+
+     /**
      * Closes the database connection.
      * This method is synchronized to prevent concurrent access issues.
      */
@@ -101,22 +113,35 @@ public class VelocityWhitelist {
     @Subscribe
     public void onProxyInitialization(ProxyInitializeEvent event) {
         try {
-            int pluginId = 25057;
-            Metrics metrics = metricsFactory.make(this, pluginId);
-
-            CommandManager commandManager = server.getCommandManager();
-            CommandMeta commandMeta = commandManager.metaBuilder("mywl")
-                    .plugin(this)
-                    .build();
-            BrigadierCommand commandToRegister = this.createBrigadierCommand();
-            commandManager.register(commandMeta, commandToRegister);
 
             this.saveDefaultConfig();
             this.config = loadConfig();
 
+            // Check if the debug key is present in the configuration
+            if (config.containsKey("debug")) {
+                debugEnabled = Boolean.parseBoolean(config.getProperty("debug"));
+                logger.info("Debug mode is {}", debugEnabled ? "enabled" : "disabled");
+            } else {
+                logger.warn("Debug key not found in config.properties. Defaulting to false.");
+            }
+
+            // Initialize bStats metrics
+            int pluginId = 25057;
+            Metrics metrics = metricsFactory.make(this, pluginId);
+            debugLog(metrics.toString().isEmpty() ? "Metrics initialized" : metrics.toString());
+            
+            // Create the database table if the plugin is enabled
             if (Boolean.parseBoolean(config.getProperty("enabled"))) {
                 server.getScheduler().buildTask(this, this::createDatabaseTable).schedule();
             }
+
+            // Register the whitelist command
+            CommandManager commandManager = server.getCommandManager();
+            CommandMeta commandMeta = commandManager.metaBuilder("velw")
+                    .plugin(this)
+                    .build();
+            BrigadierCommand commandToRegister = this.createBrigadierCommand();
+            commandManager.register(commandMeta, commandToRegister);
 
             /*** SAMPLE LOGO 
              *     __   __ __      __  _    
@@ -143,8 +168,8 @@ public class VelocityWhitelist {
      * and then closes the connection.
      */
     private void createDatabaseTable() {
+        debugLog("Creating database table");
         openConnection();
-
         try (PreparedStatement sql = connection.prepareStatement(
                 "CREATE TABLE IF NOT EXISTS `" + config.getProperty("table") + "` (`UUID` varchar(100), `user` varchar(100)) ;")) {
             sql.execute();
@@ -162,6 +187,7 @@ public class VelocityWhitelist {
      */
     public void saveDefaultConfig() {
         if (Files.notExists(dataDirectory)) {
+            debugLog("Creating data directory");
             try {
                 Files.createDirectories(dataDirectory);
             } catch (IOException e) {
@@ -169,9 +195,13 @@ public class VelocityWhitelist {
             }
         }
         if (Files.notExists(configFile)) {
+            debugLog("Saving default configuration");
             String defaultConfigContent = """
                     # Whitelist Status
                     enabled: false
+                    
+                    # Enable Debug Messages
+                    debug: false
 
                     # MySQL settings
                     host: localhost
@@ -202,6 +232,8 @@ public class VelocityWhitelist {
     private Properties loadConfig() {
         Properties properties = new Properties();
 
+        debugLog("Loading configuration");
+
         if (Files.exists(configFile)) {
             try (InputStream input = Files.newInputStream(configFile, StandardOpenOption.READ)) {
                 InputStreamReader reader = new InputStreamReader(input, StandardCharsets.UTF_8);
@@ -220,13 +252,14 @@ public class VelocityWhitelist {
      * @param properties The Properties object containing the configuration to save.
      */
     private void saveConfig(Properties properties) {
-       try (OutputStream output = Files.newOutputStream(configFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
-           OutputStreamWriter writer = new OutputStreamWriter(output,StandardCharsets.UTF_8);
-           properties.store(writer, "Updated Configuration");
-       } catch (IOException e) {
-           throw new RuntimeException("Error while saving configuration", e);
-       }
-   }
+        debugLog("Saving configuration");
+        try (OutputStream output = Files.newOutputStream(configFile, StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+            OutputStreamWriter writer = new OutputStreamWriter(output,StandardCharsets.UTF_8);
+            properties.store(writer, "Updated Configuration");
+        } catch (IOException e) {
+            throw new RuntimeException("Error while saving configuration", e);
+        }
+    }
 
     /**
      * Opens a connection to the MySQL database.
@@ -234,6 +267,7 @@ public class VelocityWhitelist {
      * This method is synchronized to prevent concurrent access issues.
      */
     public synchronized void openConnection() {
+        debugLog("Opening database connection");
         try {
             connection = DriverManager.getConnection("jdbc:mysql://" + config.getProperty("host") + ":" + config.getProperty("port") + "/" + config.getProperty("database") + "?useSSL=false", config.getProperty("user"), config.getProperty("password"));
         } catch (SQLException e) {
@@ -250,6 +284,8 @@ public class VelocityWhitelist {
      * @param player The name of the player to add to the whitelist.
      */
     public void addWhitelist(CommandSource source, String player) {
+
+        debugLog("Adding " + player + " to the whitelist");
         this.openConnection();
 
         try {
@@ -283,6 +319,8 @@ public class VelocityWhitelist {
      * @param player The name of the player to delete from the whitelist.
      */
     public void delWhitelist(CommandSource source, String player) {
+
+        debugLog("Removing " + player + " from the whitelist");
         this.openConnection();
 
         try {
@@ -306,8 +344,11 @@ public class VelocityWhitelist {
      * @return The BrigadierCommand instance.
      */
     public BrigadierCommand createBrigadierCommand() {
-        LiteralCommandNode<CommandSource> helloNode = BrigadierCommand.literalArgumentBuilder("mywl")
-                .requires(source -> source.hasPermission("mysqlwhitelist"))
+
+        debugLog("Creating Brigadier command");
+
+        LiteralCommandNode<CommandSource> helloNode = BrigadierCommand.literalArgumentBuilder("velw")
+                .requires(source -> source.hasPermission("velocitywhitelist"))
                 .executes(context -> {
                     CommandSource source = context.getSource();
                     sendUsageMessage(source, "all");
@@ -315,13 +356,14 @@ public class VelocityWhitelist {
                 })
                 .then(BrigadierCommand.requiredArgumentBuilder("argument", StringArgumentType.greedyString())
                                 .suggests((ctx, builder) -> {
-                                    builder.suggest("add").suggest("del");
-//                                    .suggest("on").suggest("off");
+                                    builder.suggest("add").suggest("del").suggest("debug").suggest("enable").suggest("disable");
                                     return builder.buildFuture();
                                 })
                                 .executes(context -> {
                                     CommandSource source = context.getSource();
                                     String[] arguments = context.getArgument("argument", String.class).split(" ");
+
+                                    debugLog("Command arguments: " + String.join(", ", arguments));
 
                                     // Check if the command has only one argument
                                     if (arguments.length == 1) {
@@ -334,18 +376,22 @@ public class VelocityWhitelist {
                                         } else if (arguments[0].equals("del")) {
                                             sendUsageMessage(source, "del");
                                         
-                                        // Handle 'on' command to enable the whitelist
-                                        } else if (arguments[0].equals("on")) {
+                                        // Handle 'enable' command to enable the whitelist
+                                        } else if (arguments[0].equals("enable")) {
                                             config.setProperty("enabled", String.valueOf(true));
                                             saveConfig(config);
                                             source.sendMessage(Component.text("Whitelist enabled", NamedTextColor.GREEN));
                                         
-                                        // Handle 'off' command to disable the whitelist
-                                        } else if (arguments[0].equals("off")) {
+                                        // Handle 'disable' command to disable the whitelist
+                                        } else if (arguments[0].equals("disable")) {
                                             config.setProperty("enabled", String.valueOf(false));
                                             saveConfig(config);
                                             source.sendMessage(Component.text("Whitelist disabled", NamedTextColor.AQUA));
-                                        
+
+                                        // Handle 'debug' command with missing on/off argument
+                                        } else if (arguments[0].equals("debug")) {
+                                            sendUsageMessage(source, "debug");
+
                                         // Handle unknown command
                                         } else {
                                             sendUsageMessage(source, "all");
@@ -361,6 +407,16 @@ public class VelocityWhitelist {
                                         // Handle 'del' command with player name
                                         } else if (arguments[0].equals("del")) {
                                             delWhitelist(source, arguments[1]);
+                                        
+                                        // Handle 'debug' command with on/off argument
+                                        } else if (arguments[0].equals("debug")) {
+                                            if (arguments[1].equalsIgnoreCase("on")) {
+                                                setDebugMode(source, true);
+                                            } else if (arguments[1].equalsIgnoreCase("off")) {
+                                                setDebugMode(source, false);
+                                            } else {
+                                                sendUsageMessage(source, "debug");
+                                            }
                                         
                                         // Handle unknown command
                                         } else {
@@ -380,6 +436,20 @@ public class VelocityWhitelist {
     }
 
     /**
+     * Sets the debug mode and updates the configuration.
+     * This method updates the debugEnabled field, saves the configuration, and sends a message to the command source.
+     *
+     * @param source The CommandSource who executed the command.
+     * @param enable True to enable debug mode, false to disable.
+     */
+    public void setDebugMode(CommandSource source, boolean enable) {
+        debugEnabled = enable;
+        config.setProperty("debug", String.valueOf(enable));
+        saveConfig(config);
+        source.sendMessage(Component.text("Debug mode is now " + (enable ? "enabled" : "disabled"), enable ? NamedTextColor.GREEN : NamedTextColor.RED));
+    }
+
+    /**
      * Sends a usage message to the command source.
      * This method constructs a message based on the specified subcommand.
      *
@@ -387,11 +457,14 @@ public class VelocityWhitelist {
      * @param subcommand  The subcommand for which to display usage.
      */
     public void sendUsageMessage(CommandSource source, String subcommand) {
+
+        debugLog("Sending usage message for " + subcommand);
+
         String usage = switch (subcommand) {
-            case "all" -> "/mywl add/del/on/off <player>";
-//            case "all" -> "/mywl add/del <player>";
-            case "add" -> "/mywl add <player>";
-            case "del" -> "/mywl del <player>";
+            case "all" -> "/velw add/del <player> | enable/disable | debug <on/off>";
+            case "add" -> "/velw add <player>";
+            case "del" -> "/velw del <player>";
+            case "debug" -> "/velw debug <on/off>";
             default -> "";
         };
 
@@ -410,6 +483,9 @@ public class VelocityWhitelist {
      * @return True if the player is whitelisted, false otherwise.
      */
     public boolean isWhitelisted(Player player) {
+
+        debugLog("Checking if " + player.getUsername() + " is whitelisted");
+
         try {
             openConnection();
 
@@ -424,6 +500,8 @@ public class VelocityWhitelist {
 
                 if (rs.next()) {
                     // Player is already in the whitelist, update username if necessary
+                    debugLog("Player is already whitelisted with UUID " + uuid.toString());
+                    debugLog("Updating username for " + player.getUsername());
                     String updateQuery = "UPDATE `" + tableName + "` SET `user`=? WHERE `UUID`=?";
                     try (PreparedStatement updateStatement = connection.prepareStatement(updateQuery)) {
                         updateStatement.setString(1, player.getUsername());
@@ -442,10 +520,12 @@ public class VelocityWhitelist {
 
                 if (!rs2.next()) {
                     // Player is not in the whitelist
+                    debugLog("Player is not whitelisted");
                     return false;
                 }
 
                 // Update the entry with the player's UUID
+                debugLog("Updating UUID for " + player.getUsername());
                 String updateUuidQuery = "UPDATE `" + tableName + "` SET `UUID`=? WHERE `user`=?";
                 try (PreparedStatement updateUuidStatement = connection.prepareStatement(updateUuidQuery)) {
                     updateUuidStatement.setString(1, uuid.toString());
@@ -477,6 +557,8 @@ public class VelocityWhitelist {
             logger.error("LoginEvent triggered with a null player.");
             return;
         }
+
+        debugLog("Player login: " + player.getUsername());
 
         // Check if the whitelist is enabled and if the player is not whitelisted
         if (Boolean.parseBoolean(config.getProperty("enabled")) && !this.isWhitelisted(player)) {

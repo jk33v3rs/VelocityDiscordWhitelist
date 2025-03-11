@@ -33,7 +33,7 @@ shadowJar {
 }
 
 group = 'top.rathinosk'
-version = '1.2.6'
+version = '1.2.7'
 description = 'Velocity plugin for managing a Minecraft whitelist using MySQL'
 
 def targetJavaVersion = 17

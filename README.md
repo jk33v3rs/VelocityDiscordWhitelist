@@ -20,6 +20,9 @@ The plugin uses a configuration file (`config.properties`) located in the `plugi
 # Whitelist Status
 enabled: false
 
+# Enable Debug Messages
+debug: false
+
 # MySQL settings
 host: localhost
 user: username
@@ -40,20 +43,21 @@ message: Sorry, you are not in the whitelist.
 
 ## Commands
 
-- `/mywl on`: Turn ON the whitelist.
-- `/mywl off`: Turn OFF the whitelist.
-- `/mywl add <player>`: Add a player to the whitelist.
-- `/mywl del <player>`: Remove a player from the whitelist.
+- `/velw enable`: Enable the whitelist.
+- `/velw disable`: Disable the whitelist.
+- `/velw add <player>`: Add a player to the whitelist.
+- `/velw del <player>`: Remove a player from the whitelist.
+- `/velw debug <on/off>`: Turn debug messages on or off
 
 ## Permissions
 
-- `mysqlwhitelist`: Required to use whitelist management commands.
+- `velocitywhitelist`: Required to use whitelist management commands.
 
 ## Usage
 
 1. Configure the MySQL connection details in the `config.properties` file.
 2. Start the proxy.
-3. Use the `/mywl` command to manage the whitelist.
+3. Use the `/velw` command to manage the whitelist.
 
 ## Issues and Contributions
 
