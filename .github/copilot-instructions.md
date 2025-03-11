@@ -1,6 +1,8 @@
 ## Project Details
 This is a Velocity Proxy plugin for managing a Minecraft whitelist using MySQL/MariaDB as the backend storage.
 
+This is NOT a ban manager, it is a whitelist plugin ONLY.
+
 ## Code Cleanup
 - If asked to clean up a file, do not remove inline comments unless explicity told to do so.
 

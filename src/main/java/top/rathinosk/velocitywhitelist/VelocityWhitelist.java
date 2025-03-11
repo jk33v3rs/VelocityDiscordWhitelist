@@ -411,6 +411,30 @@ public class VelocityWhitelist {
     }
 
     /**
+     * Reloads the plugin configuration.
+     * This method reloads the configuration from the config file and updates the plugin's settings.
+     *
+     * @param source The CommandSource who executed the command.
+     */
+    public void reloadConfig(CommandSource source) {
+        debugLog("Reloading configuration");
+        try {
+            this.config = loadConfig();
+            // Update debugEnabled based on the reloaded config
+            if (config.containsKey("debug")) {
+                debugEnabled = Boolean.parseBoolean(config.getProperty("debug"));
+                logger.info("Debug mode is {}", debugEnabled ? "enabled" : "disabled");
+            } else {
+                logger.warn("Debug key not found in config.properties. Keeping the current value: " + debugEnabled);
+            }
+            source.sendMessage(Component.text("Configuration reloaded successfully.", NamedTextColor.GREEN));
+        } catch (Exception e) {
+            logger.error("Error while reloading configuration", e);
+            source.sendMessage(Component.text("Error while reloading configuration. Check the console for details.", NamedTextColor.RED));
+        }
+    }
+
+    /**
      * Creates a BrigadierCommand for the whitelist command.
      * This method defines the command structure and its execution logic.
      *
@@ -429,7 +453,7 @@ public class VelocityWhitelist {
                 })
                 .then(BrigadierCommand.requiredArgumentBuilder("argument", StringArgumentType.greedyString())
                                 .suggests((ctx, builder) -> {
-                                    builder.suggest("add").suggest("del").suggest("debug").suggest("enable").suggest("disable");
+                                    builder.suggest("add").suggest("del").suggest("debug").suggest("enable").suggest("disable").suggest("reload");
                                     return builder.buildFuture();
                                 })
                                 .executes(context -> {
@@ -464,6 +488,10 @@ public class VelocityWhitelist {
                                         // Handle 'debug' command with missing on/off argument
                                         } else if (arguments[0].equals("debug")) {
                                             sendUsageMessage(source, "debug");
+                                        
+                                        // Handle 'reload' command to reload the configuration
+                                        } else if (arguments[0].equals("reload")) {
+                                            reloadConfig(source);
 
                                         // Handle unknown command
                                         } else {
@@ -538,10 +566,12 @@ public class VelocityWhitelist {
         debugLog("Sending usage message for " + subcommand);
 
         String usage = switch (subcommand) {
-            case "all" -> "/vwl add/del <player> | enable/disable | debug <on/off>";
+            case "all" -> "/vwl add/del <player> | list <search> | enable/disable | reload | debug <on/off> ";
             case "add" -> "/vwl add <player>";
             case "del" -> "/vwl del <player>";
             case "debug" -> "/vwl debug <on/off>";
+            case "list" -> "/vwl list <search>";
+            case "enable", "disable", "reload" -> "/vwl " + subcommand;
             default -> "";
         };
 
