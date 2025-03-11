@@ -43,15 +43,21 @@ message: Sorry, you are not in the whitelist.
 
 ## Commands
 
+# Basic Commands
+- `/vwl add <player>`: Add a player to the whitelist.
+- `/vwl del <player>`: Remove a player from the whitelist. (with DB autocomplete)
+- `/vwl list <search>`: Lists players matching search criteria. (min 2 characters)
+
+# Admin Commands
 - `/vwl enable`: Enable the whitelist.
 - `/vwl disable`: Disable the whitelist.
-- `/vwl add <player>`: Add a player to the whitelist.
-- `/vwl del <player>`: Remove a player from the whitelist.
-- `/vwl debug <on/off>`: Turn debug messages on or off
+- `/vwl reload`: Reload the config.properties.
+- `/vwl debug <on/off>`: Turn debug messages on or off.
 
 ## Permissions
 
-- `velocitywhitelist`: Required to use whitelist management commands.
+- `velocitywhitelist`: Required to use the basic whitelist commands.
+- `velocitywhitelist.admin`: Required to use whitelist admin commands.
 
 ## Usage
 

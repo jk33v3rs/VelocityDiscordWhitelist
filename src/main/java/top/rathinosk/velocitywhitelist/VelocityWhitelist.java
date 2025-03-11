@@ -456,16 +456,29 @@ public class VelocityWhitelist {
                 })
                 .then(BrigadierCommand.requiredArgumentBuilder("action", StringArgumentType.string())
                         .suggests((context, builder) -> {
-                            builder.suggest("add").suggest("del").suggest("debug").suggest("enable").suggest("disable").suggest("reload").suggest("list");
+                            String[] suggestions = {"add", "del", "list"};
+                            CommandSource source = context.getSource();
+                            if (source.hasPermission("velocitywhitelist.admin")) {
+                                suggestions = new String[]{"add", "del", "debug", "enable", "disable", "reload", "list"};
+                            }
+                            for (String suggestion : suggestions) {
+                                builder.suggest(suggestion);
+                            }
                             return builder.buildFuture();
                         })
                         .then(BrigadierCommand.requiredArgumentBuilder("target", StringArgumentType.string())
                                 .suggests((context, builder) -> {
-                                    String action = context.getInput().split(" ")[1]; // Get the action (add/del)
-                                    if (action.equalsIgnoreCase("del")) {
-                                        return getWhitelistedPlayerSuggestions(builder);
-                                    } else if (action.equalsIgnoreCase("debug")) {
-                                        builder.suggest("on").suggest("off");
+                                    String input = context.getInput();
+                                    String[] parts = input.split(" ");
+                                    // Check if there are at least two parts in the input
+                                    if (parts.length > 1) {
+                                        String action = parts[1].trim(); // Get the action (add/del)
+                                        // Ensure that the action is the last meaningful part of the input
+                                        if (parts.length == 2 && action.equalsIgnoreCase("del")) {
+                                            return getWhitelistedPlayerSuggestions(builder);
+                                        } else if (action.equalsIgnoreCase("debug")) {
+                                            builder.suggest("on").suggest("off");
+                                        }
                                     }
                                     return Suggestions.empty();
                                 })
@@ -483,12 +496,16 @@ public class VelocityWhitelist {
                                     } else if (action.equalsIgnoreCase("list")) {
                                         listWhitelist(source, target);
                                     } else if (action.equalsIgnoreCase("debug")) {
-                                        if (target.equalsIgnoreCase("on")) {
-                                            setDebugMode(source, true);
-                                        } else if (target.equalsIgnoreCase("off")) {
-                                            setDebugMode(source, false);
+                                        if (source.hasPermission("velocitywhitelist.admin")) {
+                                            if (target.equalsIgnoreCase("on")) {
+                                                setDebugMode(source, true);
+                                            } else if (target.equalsIgnoreCase("off")) {
+                                                setDebugMode(source, false);
+                                            } else {
+                                                sendUsageMessage(source, "debug");
+                                            }
                                         } else {
-                                            sendUsageMessage(source, "debug");
+                                            source.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
                                         }
                                     } else {
                                         sendUsageMessage(source, "all");
@@ -501,17 +518,29 @@ public class VelocityWhitelist {
                             String action = context.getArgument("action", String.class);
 
                             if (action.equalsIgnoreCase("enable")) {
-                                config.setProperty("enabled", String.valueOf(true));
-                                saveConfig(config);
-                                source.sendMessage(Component.text("Whitelist enabled", NamedTextColor.GREEN));
+                                if (source.hasPermission("velocitywhitelist.admin")) {
+                                    config.setProperty("enabled", String.valueOf(true));
+                                    saveConfig(config);
+                                    source.sendMessage(Component.text("Whitelist enabled", NamedTextColor.GREEN));
+                                } else {
+                                    source.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
+                                }
                             } else if (action.equalsIgnoreCase("disable")) {
-                                config.setProperty("enabled", String.valueOf(false));
-                                saveConfig(config);
-                                source.sendMessage(Component.text("Whitelist disabled", NamedTextColor.AQUA));
+                                if (source.hasPermission("velocitywhitelist.admin")) {
+                                    config.setProperty("enabled", String.valueOf(false));
+                                    saveConfig(config);
+                                    source.sendMessage(Component.text("Whitelist disabled", NamedTextColor.AQUA));
+                                } else {
+                                    source.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
+                                }
                             } else if (action.equalsIgnoreCase("debug")) {
                                 sendUsageMessage(source, "debug");
                             } else if (action.equalsIgnoreCase("reload")) {
-                                reloadConfig(source);
+                                if (source.hasPermission("velocitywhitelist.admin")) {
+                                    reloadConfig(source);
+                                } else {
+                                    source.sendMessage(Component.text("You do not have permission to use this command.", NamedTextColor.RED));
+                                }
                             } else if (action.equalsIgnoreCase("list")) {
                                 sendUsageMessage(source, "list");
                             } else {
