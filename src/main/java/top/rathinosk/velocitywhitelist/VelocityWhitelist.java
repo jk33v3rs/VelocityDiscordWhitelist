@@ -33,6 +33,9 @@ import java.nio.file.StandardOpenOption;
 import java.sql.*;
 import java.util.Properties;
 import java.util.UUID;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * The main class for the VelocityWhitelist plugin.
@@ -451,93 +454,104 @@ public class VelocityWhitelist {
                     sendUsageMessage(source, "all");
                     return Command.SINGLE_SUCCESS;
                 })
-                .then(BrigadierCommand.requiredArgumentBuilder("argument", StringArgumentType.greedyString())
-                                .suggests((ctx, builder) -> {
-                                    builder.suggest("add").suggest("del").suggest("debug").suggest("enable").suggest("disable").suggest("reload");
-                                    return builder.buildFuture();
+                .then(BrigadierCommand.requiredArgumentBuilder("action", StringArgumentType.string())
+                        .suggests((context, builder) -> {
+                            builder.suggest("add").suggest("del").suggest("debug").suggest("enable").suggest("disable").suggest("reload").suggest("list");
+                            return builder.buildFuture();
+                        })
+                        .then(BrigadierCommand.requiredArgumentBuilder("target", StringArgumentType.string())
+                                .suggests((context, builder) -> {
+                                    String action = context.getInput().split(" ")[1]; // Get the action (add/del)
+                                    if (action.equalsIgnoreCase("del")) {
+                                        return getWhitelistedPlayerSuggestions(builder);
+                                    } else if (action.equalsIgnoreCase("debug")) {
+                                        builder.suggest("on").suggest("off");
+                                    }
+                                    return Suggestions.empty();
                                 })
                                 .executes(context -> {
                                     CommandSource source = context.getSource();
-                                    String[] arguments = context.getArgument("argument", String.class).split(" ");
+                                    String action = context.getArgument("action", String.class);
+                                    String target = context.getArgument("target", String.class);
 
-                                    debugLog("Command arguments: " + String.join(", ", arguments));
+                                    debugLog("Command arguments: action=" + action + ", target=" + target);
 
-                                    // Check if the command has only one argument
-                                    if (arguments.length == 1) {
-                                        
-                                        // Handle 'add' command with missing player name
-                                        if (arguments[0].equals("add")) {
-                                            sendUsageMessage(source, "add");
-                                        
-                                        // Handle 'del' command with missing player name
-                                        } else if (arguments[0].equals("del")) {
-                                            sendUsageMessage(source, "del");
-                                        
-                                        // Handle 'enable' command to enable the whitelist
-                                        } else if (arguments[0].equals("enable")) {
-                                            config.setProperty("enabled", String.valueOf(true));
-                                            saveConfig(config);
-                                            source.sendMessage(Component.text("Whitelist enabled", NamedTextColor.GREEN));
-                                        
-                                        // Handle 'disable' command to disable the whitelist
-                                        } else if (arguments[0].equals("disable")) {
-                                            config.setProperty("enabled", String.valueOf(false));
-                                            saveConfig(config);
-                                            source.sendMessage(Component.text("Whitelist disabled", NamedTextColor.AQUA));
-
-                                        // Handle 'debug' command with missing on/off argument
-                                        } else if (arguments[0].equals("debug")) {
+                                    if (action.equalsIgnoreCase("add")) {
+                                        addWhitelist(source, target);
+                                    } else if (action.equalsIgnoreCase("del")) {
+                                        delWhitelist(source, target);
+                                    } else if (action.equalsIgnoreCase("list")) {
+                                        listWhitelist(source, target);
+                                    } else if (action.equalsIgnoreCase("debug")) {
+                                        if (target.equalsIgnoreCase("on")) {
+                                            setDebugMode(source, true);
+                                        } else if (target.equalsIgnoreCase("off")) {
+                                            setDebugMode(source, false);
+                                        } else {
                                             sendUsageMessage(source, "debug");
-                                        
-                                        // Handle 'reload' command to reload the configuration
-                                        } else if (arguments[0].equals("reload")) {
-                                            reloadConfig(source);
-
-                                        // Handle unknown command
-                                        } else {
-                                            sendUsageMessage(source, "all");
                                         }
-
-                                      // Check if the command has two arguments
-                                    } else if (arguments.length == 2) {
-                                        
-                                        // Handle 'add' command with player name
-                                        if (arguments[0].equals("add")) {
-                                            addWhitelist(source, arguments[1]);
-                                        
-                                        // Handle 'del' command with player name
-                                        } else if (arguments[0].equals("del")) {
-                                            delWhitelist(source, arguments[1]);
-                                        
-                                        // Handle 'debug' command with on/off argument
-                                        } else if (arguments[0].equals("debug")) {
-                                            if (arguments[1].equalsIgnoreCase("on")) {
-                                                setDebugMode(source, true);
-                                            } else if (arguments[1].equalsIgnoreCase("off")) {
-                                                setDebugMode(source, false);
-                                            } else {
-                                                sendUsageMessage(source, "debug");
-                                            }
-                                        
-                                        // Handle 'list' command with search term
-                                        } else if (arguments[0].equals("list")) {
-                                            listWhitelist(source, arguments[1]);
-                                        
-                                        // Handle unknown command
-                                        } else {
-                                            sendUsageMessage(source, "all");
-                                        }
-
-                                    // Handle incorrect number of arguments
                                     } else {
                                         sendUsageMessage(source, "all");
                                     }
                                     return Command.SINGLE_SUCCESS;
                                 })
+                        )
+                        .executes(context -> {
+                            CommandSource source = context.getSource();
+                            String action = context.getArgument("action", String.class);
+
+                            if (action.equalsIgnoreCase("enable")) {
+                                config.setProperty("enabled", String.valueOf(true));
+                                saveConfig(config);
+                                source.sendMessage(Component.text("Whitelist enabled", NamedTextColor.GREEN));
+                            } else if (action.equalsIgnoreCase("disable")) {
+                                config.setProperty("enabled", String.valueOf(false));
+                                saveConfig(config);
+                                source.sendMessage(Component.text("Whitelist disabled", NamedTextColor.AQUA));
+                            } else if (action.equalsIgnoreCase("debug")) {
+                                sendUsageMessage(source, "debug");
+                            } else if (action.equalsIgnoreCase("reload")) {
+                                reloadConfig(source);
+                            } else if (action.equalsIgnoreCase("list")) {
+                                sendUsageMessage(source, "list");
+                            } else {
+                                sendUsageMessage(source, "all");
+                            }
+                            return Command.SINGLE_SUCCESS;
+                        })
                 )
                 .build();
 
         return new BrigadierCommand(helloNode);
+    }
+
+    /**
+     * Provides suggestions for whitelisted player names.
+     *
+     * @param builder The SuggestionsBuilder to add suggestions to.
+     * @return A CompletableFuture containing the suggestions.
+     */
+    private CompletableFuture<Suggestions> getWhitelistedPlayerSuggestions(SuggestionsBuilder builder) {
+        return CompletableFuture.supplyAsync(() -> {
+            openConnection();
+            try {
+                String sqlQuery = "SELECT `user` FROM `" + config.getProperty("table") + "` WHERE `user` LIKE ?;";
+                try (PreparedStatement sql = connection.prepareStatement(sqlQuery)) {
+                    sql.setString(1, builder.getRemaining().toLowerCase() + "%");
+                    try (ResultSet rs = sql.executeQuery()) {
+                        while (rs.next()) {
+                            String username = rs.getString("user");
+                            builder.suggest(username);
+                        }
+                    }
+                }
+            } catch (SQLException e) {
+                logger.error("Error while listing whitelisted players for suggestions", e);
+            } finally {
+                closeConnection();
+            }
+            return builder.build();
+        });
     }
 
     /**
