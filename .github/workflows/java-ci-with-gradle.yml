@@ -26,8 +26,13 @@ jobs:
       run: |-
         ./gradlew shadowJar
 
+    - name: Get version from gradle.properties
+      run: |
+        VERSION=$(./gradlew properties | grep version: | awk '{print $2}')
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v4.6.1
       with:
-        name: build-artifacts
-        path: build/libs/
+        name: VelocityWhitelist-${{ env.VERSION }}-all.jar
+        path: build/libs/VelocityWhitelist-${{ env.VERSION }}-all.jar
