@@ -1,3 +1,6 @@
+// This file is part of VelocityWhitelist.
+// Copyright (C) 2025 Rathinosk
+//
 plugins {
     id 'java'
     id 'eclipse'
