@@ -142,10 +142,12 @@ public class DiscordBotHandler extends ListenerAdapter {
             roleIdMap.put("UNVERIFIED", unverifiedRoleId);
             roleIdMap.put("PURGATORY", purgatoryRoleId);
 
-            // Setup JDA
-            JDABuilder builder = JDABuilder.createDefault(token)
-                    .enableIntents(GatewayIntent.GUILD_MESSAGES, GatewayIntent.MESSAGE_CONTENT, GatewayIntent.GUILD_MEMBERS)
-                    .enableCache(CacheFlag.MEMBER_OVERRIDES)
+            // Setup JDA with minimal resource usage for whitelist-only functionality
+            JDABuilder builder = JDABuilder.createLight(token, GatewayIntent.GUILD_MESSAGES, GatewayIntent.MESSAGE_CONTENT)
+                    .disableCache(CacheFlag.ACTIVITY, CacheFlag.VOICE_STATE, CacheFlag.EMOJI, CacheFlag.CLIENT_STATUS, CacheFlag.ONLINE_STATUS)
+                    .setMemberCachePolicy(net.dv8tion.jda.api.utils.MemberCachePolicy.NONE)
+                    .setChunkingFilter(net.dv8tion.jda.api.utils.ChunkingFilter.NONE)
+                    .disableIntents(GatewayIntent.GUILD_PRESENCES, GatewayIntent.GUILD_MESSAGE_TYPING, GatewayIntent.DIRECT_MESSAGE_TYPING)
                     .addEventListeners(this);
 
             // Set a timeout for the connection establishment

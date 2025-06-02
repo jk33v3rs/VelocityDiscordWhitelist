@@ -39,7 +39,7 @@ dependencies {
     implementation 'org.mariadb.jdbc:mariadb-java-client:3.3.3'
     implementation 'org.bstats:bstats-velocity:3.1.0'
     implementation 'org.xerial:sqlite-jdbc:3.44.1.0'
-    compileOnly 'net.dv8tion:JDA:5.0.0-beta.21'    
+    implementation 'net.dv8tion:JDA:5.0.0-beta.21'    
     implementation 'com.zaxxer:HikariCP:5.1.0'
     compileOnly 'net.milkbowl.vault:VaultUnlockedAPI:2.10'
     implementation 'org.yaml:snakeyaml:2.2'
@@ -54,10 +54,24 @@ shadowJar {
     relocate 'org.sqlite', 'top.jk33v3rs.velocitydiscordwhitelist.sqlite'
     relocate 'org.mariadb.jdbc', 'top.jk33v3rs.velocitydiscordwhitelist.mariadb.jdbc'    
     relocate 'com.zaxxer.hikari', 'top.jk33v3rs.velocitydiscordwhitelist.hikari'
+    relocate 'net.dv8tion.jda', 'top.jk33v3rs.velocitydiscordwhitelist.jda'
     
+    // Exclude unnecessary components to reduce size
     exclude 'META-INF/versions/**'
     exclude 'META-INF/LICENSE*'
     exclude 'META-INF/NOTICE*'
+    exclude 'META-INF/maven/**'
+    exclude '**/module-info.class'
+    exclude 'org/slf4j/**'
+    exclude 'ch/qos/logback/**'
+    
+    // Minimize JDA dependencies - exclude unused audio/voice components
+    exclude 'net/dv8tion/jda/api/audio/**'
+    exclude 'net/dv8tion/jda/internal/audio/**'
+    exclude 'natives/**'
+    exclude 'tomp2p/**'
+    exclude 'opus-java/**'
+    exclude 'club/minnced/**'
     
     manifest {
         attributes(
