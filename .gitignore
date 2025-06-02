@@ -123,7 +123,41 @@ run/
 # Ignore build output and IDE folders
 build/
 bin/
+target/
+
+# VS Code
 .vscode/
+*.code-workspace
+
+# Eclipse
+.project
+.classpath
+.settings/
+.metadata/
+
+# NetBeans
+nbproject/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# Temporary and backup files
+*.tmp
+*.bak
+*.swp
+*~
+.DS_Store
+
+# Environment and config files that shouldn't be tracked
+config.yaml
+*.env
+.env*
+
+# Documentation and notes (keeping only essential docs)
+*.md.backup
+notes/
+docs/draft/
 
 # Placeholder files in development (to be whitelisted as they're completed)
 # API Interfaces
@@ -147,6 +181,12 @@ src/main/java/top/jk33v3rs/velocitydiscordwhitelist/modules/StatsModule.java
 src/main/java/top/jk33v3rs/velocitydiscordwhitelist/modules/RewardsManager.java
 src/main/java/top/jk33v3rs/velocitydiscordwhitelist/modules/ShopManager.java
 
-# Project specific
+# Project specific exclusions
 /src/main/java/top/jk33v3rs/velocitydiscordwhitelist/modules/DiscordRewards/
 /src/main/java/top/jk33v3rs/velocitydiscordwhitelist/modules/DiscordRewards/**
+
+# Log files and runtime data
+logs/
+*.log*
+crash-reports/
+debug/
