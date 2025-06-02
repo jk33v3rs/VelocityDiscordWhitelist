@@ -1,0 +1,293 @@
+# ==========================================
+# VELOCITYDISCORDWHITELIST MESSAGES
+# Version: 1.3.2
+# Build: 20250525-2
+# ==========================================
+
+# ==========================================
+# CORE WHITELIST MESSAGES
+# ==========================================
+
+# Basic whitelist messages
+kick_message: "You're Not Yet Whitelisted. Jump on our Discord for further instructions!"
+whitelisted_message: "{player} is now whitelisted."
+removed_message: "{player} is no longer whitelisted."
+list_message: "Whitelisted Players: {players}"
+error_message: "An error occurred. Please check the logs for details."
+
+# Whitelist status messages
+whitelist_enabled: "Whitelist enabled"
+whitelist_disabled: "Whitelist disabled"
+whitelist_already_enabled: "Whitelist is already enabled"
+whitelist_already_disabled: "Whitelist is already disabled"
+
+# Player already exists messages
+player_already_whitelisted: "{player} is already whitelisted."
+player_not_whitelisted: "{player} is not whitelisted."
+player_not_found: "Player {player} not found."
+
+# ==========================================
+# PERMISSION MESSAGES
+# ==========================================
+
+# Permission denied messages
+no_permission: "You do not have permission to use this command."
+no_permission_admin: "You do not have permission to use admin commands."
+no_permission_player: "You do not have permission to use player commands."
+no_permission_whitelist: "You do not have permission to manage the whitelist."
+no_permission_reload: "You do not have permission to reload the configuration."
+no_permission_debug: "You do not have permission to toggle debug mode."
+
+# ==========================================
+# COMMAND MESSAGES
+# ==========================================
+
+# Command usage messages
+usage_main: "/vwl add/del <player> | list <search> | enable/disable | reload | debug <on/off>"
+usage_add: "/vwl add <player>"
+usage_del: "/vwl del <player>"
+usage_list: "/vwl list <search>"
+usage_debug: "/vwl debug <on/off>"
+usage_enable: "/vwl enable"
+usage_disable: "/vwl disable"
+usage_reload: "/vwl reload"
+
+# Command feedback messages
+config_reloaded: "Configuration reloaded successfully."
+config_reload_error: "Error while reloading configuration. Check the console for details."
+debug_enabled: "Debug mode is now enabled"
+debug_disabled: "Debug mode is now disabled"
+
+# Search messages
+search_too_short: "Search query too short. Minimum 2 characters required."
+search_no_results: "No whitelisted players found matching '{query}'."
+search_invalid_chars: "Search contains invalid characters."
+
+# ==========================================
+# VERIFICATION AND DISCORD MESSAGES
+# ==========================================
+
+# Verification process messages
+verification_expired: "Your verification session has expired. Please try again."
+verification_success: "Welcome! You have been successfully whitelisted."
+verification_failed: "Verification failed. Please try again."
+verification_invalid_code: "Invalid verification code. Please check and try again."
+verification_max_attempts: "Maximum verification attempts reached. Please wait before trying again."
+
+# Verification session messages
+verification_active_session: "&cYou already have an active verification session. Use /verify with your code or check Discord."
+verification_session_expired: "&cYour verification session has expired. Please use /mc to get a new code."
+verification_code_used: "&cThis code has already been used. Please use /mc to get a new code if needed."
+verification_no_session: "&cYou don't have an active verification session. Use /mc to start one."
+verification_session_start: "&aPlease join our Discord server and link your account using the code: {code}"
+verification_session_instructions: "&bOnce you have linked your account, use /verify <code> with the code you receive."
+verification_complete_success: "&aSuccessfully verified! You can now join the server."
+verification_complete_error: "&cAn error occurred during verification. Please try again or contact an admin."
+verification_discord_linked: "&aYour Minecraft account has been linked to Discord account {discord_username}"
+verification_invalid_attempts: "&cInvalid verification code. Please check the code and try again. ({attempts_left} attempts remaining)"
+verification_warning_attempts: "&6Warning: After {attempts_left} more failed attempts, you'll need to start over with /mc"
+verification_max_attempts_reached: "&cToo many failed attempts. Please use /mc to start over."
+verification_usage: "&cUsage: /verify <code>"
+
+# Discord integration messages
+discord_verification_start: "Verification started for {player}. Code: {code}"
+discord_verification_complete: "Player {player} has been successfully verified!"
+discord_connection_failed: "Failed to connect to Discord. Please check your configuration."
+discord_bot_offline: "Discord bot is currently offline."
+
+# ==========================================
+# XP SYSTEM MESSAGES
+# ==========================================
+
+# XP gain messages
+xp_gained: "You gained {amount} XP from {source}!"
+xp_rate_limited: "XP gain rate limited. Please slow down!"
+xp_system_disabled: "XP system is currently disabled."
+
+# Rank progression messages
+rank_up: "Congratulations! You've reached rank {rank}!"
+rank_progress: "You are currently rank {rank} with {xp} total XP."
+rank_next_requirement: "You need {xp_needed} more XP to reach rank {next_rank}."
+rank_max_reached: "You have reached the maximum rank!"
+
+# XP chart messages
+xp_chart_header: "=== XP Chart and Progress ==="
+xp_chart_current_rank: "Current Rank: {rank} ({xp}/{max_xp} XP)"
+xp_chart_progress_bar: "Progress: {progress_bar} {percentage}%"
+xp_chart_rate_limits: "Rate Limits: {events_minute}/{max_minute} per minute"
+xp_chart_recent_gains: "Recent XP Gains:"
+xp_chart_no_recent: "No recent XP gains found."
+
+# XP modifiers information
+xp_modifiers_header: "=== XP Modifiers ==="
+xp_modifier_advancement: "Advancements: {modifier}x"
+xp_modifier_playtime: "Playtime: {modifier}x"
+xp_modifier_kills: "Kills: {modifier}x"
+xp_modifier_mining: "Mining: {modifier}x"
+
+# ==========================================
+# PURGATORY SYSTEM MESSAGES
+# ==========================================
+
+# Purgatory status messages
+purgatory_welcome: "Welcome to the verification server. Please use /verify to begin."
+purgatory_timeout: "Verification session timed out. Please start over."
+purgatory_full: "Verification server is full. Please try again later."
+purgatory_invalid_session: "Invalid verification session. Please start over."
+
+# Grace period messages
+purgatory_grace_period: "You have {minutes} minutes remaining to complete verification."
+purgatory_grace_expired: "Grace period expired. You will be moved to the lobby."
+
+# ==========================================
+# DATABASE MESSAGES
+# ==========================================
+
+# Database connection messages
+database_connected: "Database connected successfully."
+database_connection_failed: "Failed to connect to database: {error}"
+database_reconnecting: "Attempting to reconnect to database..."
+database_query_error: "Database query failed: {error}"
+
+# Backup messages
+backup_started: "Database backup started."
+backup_completed: "Database backup completed successfully."
+backup_failed: "Database backup failed: {error}"
+backup_restored: "Database restored from backup successfully."
+
+# ==========================================
+# ECONOMY INTEGRATION MESSAGES
+# ==========================================
+
+# Vault/TNE economy messages
+economy_reward_given: "You received {amount} {currency} for being whitelisted!"
+economy_rank_bonus: "You received {amount} {currency} for reaching rank {rank}!"
+economy_insufficient_funds: "Insufficient funds for this operation."
+economy_system_error: "Economy system error. Please try again later."
+
+# ==========================================
+# ERROR MESSAGES (ADMIN ONLY)
+# ==========================================
+
+# System error messages (admin-visible only)
+system_error_generic: "A system error occurred. Check logs for details."
+system_error_database: "Database error: {error}"
+system_error_discord: "Discord integration error: {error}"
+system_error_config: "Configuration error: {error}"
+system_error_xp: "XP system error: {error}"
+
+# File operation errors
+file_not_found: "File not found: {filename}"
+file_permission_denied: "Permission denied accessing file: {filename}"
+file_corrupt: "File appears to be corrupted: {filename}"
+
+# ==========================================
+# SUCCESS MESSAGES
+# ==========================================
+
+# Operation success messages
+operation_successful: "Operation completed successfully."
+player_added_successfully: "Player {player} added to whitelist successfully."
+player_removed_successfully: "Player {player} removed from whitelist successfully."
+settings_updated: "Settings updated successfully."
+cache_cleared: "Cache cleared successfully."
+
+# ==========================================
+# WHITELIST COMMAND SPECIFIC MESSAGES
+# ==========================================
+
+# Whitelist listing messages
+whitelist_search_too_short: "Search string must be at least 2 characters long."
+whitelist_search_invalid_chars: "Invalid characters in search string."
+whitelist_search_not_enough_chars: "Not enough usable characters."
+whitelist_search_no_chars: "No usable characters found."
+whitelist_players_matching: "Whitelisted Players matching '{search}':"
+whitelist_no_players_found: "No whitelisted players found matching '{search}'."
+whitelist_list_error: "An error occurred while listing whitelisted players."
+
+# Whitelist add/remove messages
+whitelist_player_added: "{player} is now whitelisted."
+whitelist_player_removed: "{player} is no longer whitelisted."
+
+# Admin command messages
+whitelist_enabled_success: "Whitelist enabled"
+whitelist_disabled_success: "Whitelist disabled"
+reload_config_success: "Configuration reloaded successfully."
+reload_config_error: "Error while reloading configuration. Check the console for details."
+
+# Permission denied messages
+permission_denied_generic: "You do not have permission to use this command."
+permission_denied_admin: "You do not have permission to use admin commands."
+
+# Debug mode messages
+debug_mode_enabled: "Debug mode is now enabled"
+debug_mode_disabled: "Debug mode is now disabled"
+
+# Usage messages for each command
+usage_header: "Usage:"
+usage_vwl_all: "/vwl add/del <player> | list <search> | enable/disable | reload | debug <on/off> "
+usage_vwl_add: "/vwl add <player>"
+usage_vwl_del: "/vwl del <player>"
+usage_vwl_debug: "/vwl debug <on/off>"
+usage_vwl_list: "/vwl list <search>"
+usage_vwl_enable: "/vwl enable"
+usage_vwl_disable: "/vwl disable"
+usage_vwl_reload: "/vwl reload"
+
+# Whitelist command error messages
+whitelist:
+  error:
+    database: "&cAn error occurred while checking the whitelist."
+    general: "&cAn error occurred."
+  not_whitelisted: "&cYou are not whitelisted on this server."
+  search:
+    too_short: "&cSearch query must be at least 3 characters long."
+    invalid_characters: "&cSearch query contains invalid characters."
+    no_usable_characters: "&cSearch query contains no usable characters."
+  command:
+    add:
+      success: "&aPlayer %player% has been added to the whitelist."
+      already_exists: "&ePlayer %player% is already whitelisted."
+      error: "&cFailed to add player %player% to the whitelist."
+    remove:
+      success: "&aPlayer %player% has been removed from the whitelist."
+      not_found: "&ePlayer %player% is not on the whitelist."
+      error: "&cFailed to remove player %player% from the whitelist."
+    enable:
+      success: "&aWhitelist has been enabled."
+      error: "&cFailed to enable whitelist."
+    disable:
+      success: "&aWhitelist has been disabled."
+      error: "&cFailed to disable whitelist."
+    list:
+      error: "&cFailed to retrieve whitelist."
+    usage: "&cUsage: /whitelist <add|remove|list|enable|disable> [player]"
+
+# Plugin initialization and configuration errors
+plugin:
+  init:
+    discord_bot_failed: "&cFailed to initialize Discord bot"
+    plugin_failed: "&cFailed to initialize plugin"
+  config:
+    reload_failed: "&cError reloading configuration"
+    save_failed: "&cError saving default configuration"
+    load_failed: "&cError loading configuration"
+  database:
+    connection_failed: "&cFailed to initialize database connection pool"
+    driver_failed: "&cFailed to load MariaDB JDBC driver"
+    tables_failed: "&cError creating database tables"
+    close_failed: "&cError closing database resources"
+
+# Purgatory system messages
+purgatory:
+  restriction: "&cYou must complete verification before connecting to other servers. Use /verify with your code."
+  cleanup_failed: "&cError during purgatory cleanup"
+
+# Command system messages
+command:
+  permission_denied: "&cYou do not have permission to use this command."
+  usage:
+    invalid: "&cInvalid command usage."
+  debug:
+    enabled: "&aDebug mode enabled."
+    disabled: "&aDebug mode disabled."

@@ -1,43 +1,77 @@
-// This file is part of VelocityWhitelist.
-// Copyright (C) 2025 Rathinosk
-//
 plugins {
     id 'java'
-    id 'eclipse'
-    id "org.jetbrains.gradle.plugin.idea-ext" version "1.1.10"
-    id "com.github.johnrengelman.shadow" version "8.1.1"
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
+version = '1.0.0'
+
 repositories {
+    mavenCentral()
     maven {
         name = 'papermc'
         url = 'https://repo.papermc.io/repository/maven-public/'
     }
-    mavenCentral() // Add Maven Central as a fallback repository
-}
-
-configurations {
-    shadowImplementation {
-        canBeResolved = true
-        canBeConsumed = false
-        extendsFrom configurations.implementation
+    maven {
+        name = 'jitpack'
+        url = 'https://jitpack.io'
+    }
+    maven {
+        name = 'sonatype'
+        url = 'https://oss.sonatype.org/content/repositories/snapshots/'
+    }
+    maven {
+        name = 'sonatype-releases'
+        url = 'https://oss.sonatype.org/content/repositories/releases/'
+    }
+    maven {
+        name = 'codemc'
+        url = 'https://repo.codemc.org/repository/maven-public'
+    }
+    maven {
+        name = 'theneweconomy'
+        url = 'https://repo.theneweconomy.net/repository/maven-public/'
     }
 }
 
 dependencies {
     compileOnly 'com.velocitypowered:velocity-api:3.4.0-SNAPSHOT'
     annotationProcessor 'com.velocitypowered:velocity-api:3.4.0-SNAPSHOT'
-    implementation 'org.mariadb.jdbc:mariadb-java-client:2.7.12'
+    implementation 'org.mariadb.jdbc:mariadb-java-client:3.3.3'
     implementation 'org.bstats:bstats-velocity:3.1.0'
+    implementation 'org.xerial:sqlite-jdbc:3.44.1.0'
+    compileOnly 'net.dv8tion:JDA:5.0.0-beta.21'    
+    implementation 'com.zaxxer:HikariCP:5.1.0'
+    compileOnly 'net.milkbowl.vault:VaultUnlockedAPI:2.10'
+    implementation 'org.yaml:snakeyaml:2.2'
+    compileOnly 'org.slf4j:slf4j-api:2.0.12'
+    compileOnly 'ch.qos.logback:logback-classic:1.4.11'
 }
 
 shadowJar {
-    relocate 'org.bstats', 'top.rathinosk.velocitywhitelist'
+    archiveClassifier.set('all')
+    relocate 'org.bstats', 'top.jk33v3rs.velocitydiscordwhitelist.bstats'
+    relocate 'org.yaml.snakeyaml', 'top.jk33v3rs.velocitydiscordwhitelist.yaml'
+    relocate 'org.sqlite', 'top.jk33v3rs.velocitydiscordwhitelist.sqlite'
+    relocate 'org.mariadb.jdbc', 'top.jk33v3rs.velocitydiscordwhitelist.mariadb.jdbc'    
+    relocate 'com.zaxxer.hikari', 'top.jk33v3rs.velocitydiscordwhitelist.hikari'
+    
+    exclude 'META-INF/versions/**'
+    exclude 'META-INF/LICENSE*'
+    exclude 'META-INF/NOTICE*'
+    
+    manifest {
+        attributes(
+            'Implementation-Version': project.version,
+            'Implementation-Title': 'Velocity Discord Whitelist',
+            'Implementation-Vendor': 'jk33v3rs',
+            'Built-By': System.getProperty('user.name'),
+            'Build-Date': new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").format(new Date())
+        )
+    }
 }
 
-group = 'top.rathinosk'
-version = '1.2.8'
-description = 'Velocity plugin for managing a Minecraft whitelist using MySQL'
+group = 'top.jk33v3rs'
+description = 'A Velocity Whitelisting App with Support for Discord Integration'
 
 def targetJavaVersion = 17
 java {
@@ -51,32 +85,45 @@ java {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
-
-    if (targetJavaVersion >= 10 || JavaVersion.current().isJava10Compatible()) {
+    if (targetJavaVersion >= 17 || JavaVersion.current().isJava17Compatible()) {
         options.release.set(targetJavaVersion)
     }
 }
 
-def templateSource = file('src/main/templates')
-def templateDest = layout.buildDirectory.dir('generated/sources/templates')
-def generateTemplates = tasks.register('generateTemplates', Copy) { task ->
-    def props = [
-            'id'         : "velocitywhitelist",
-            'name'       : project.name,
-            'version'    : project.version,
-            'link'       : "https://github.com/rathinosk/VelocityWhitelist",
-            'description': project.description,
-            'authors'    : "rathinosk",
-            'buildDate'  : java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"))
-    ]
-    task.inputs.properties props
-
-    task.from templateSource
-    task.into templateDest
-    task.expand props
+tasks.withType(Jar) {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
 }
 
-sourceSets.main.java.srcDir(generateTemplates.map { it.outputs })
+processResources {
+    inputs.property "version", project.version
+    filesMatching("velocity-plugin.json") {
+        expand "version": project.version
+    }
+}
 
-idea.project.settings.taskTriggers.afterSync(generateTemplates)
-tasks.named("eclipse") { it.dependsOn(generateTemplates) }
+task generateBuildConstants(type: Copy) {
+    def props = [
+        'id'         : project.name.toLowerCase(),
+        'name'       : "Velocity Discord Whitelist",
+        'mainClass'  : "top.jk33v3rs.velocitydiscordwhitelist.modules.VelocityDiscordWhitelist",
+        'version'    : project.version,
+        'link'       : "https://github.com/jk33v3rs/VelocityDiscordWhitelist",
+        'description': project.description,
+        'authors'    : "jk33v3rs",
+        'buildDate'  : java.time.LocalDate.now().toString()
+    ]
+
+    from 'src/main/templates'
+    into "${buildDir}/generated/sources/templates"
+    expand props
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir "${buildDir}/generated/sources/templates"
+        }
+    }
+}
+
+compileJava.dependsOn generateBuildConstants

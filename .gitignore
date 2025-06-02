@@ -119,3 +119,34 @@ run/
 
 # Other files and directories to ignore
 .out/
+
+# Ignore build output and IDE folders
+build/
+bin/
+.vscode/
+
+# Placeholder files in development (to be whitelisted as they're completed)
+# API Interfaces
+src/main/java/top/jk33v3rs/velocitydiscordwhitelist/api/VaultInterface.java
+src/main/java/top/jk33v3rs/velocitydiscordwhitelist/api/LuckPermsInterface.java
+src/main/java/top/jk33v3rs/velocitydiscordwhitelist/api/TNEInterface.java
+src/main/java/top/jk33v3rs/velocitydiscordwhitelist/api/QuickShopInterface.java
+
+# Handlers
+src/main/java/top/jk33v3rs/velocitydiscordwhitelist/modules/TNEHandler.java
+src/main/java/top/jk33v3rs/velocitydiscordwhitelist/modules/LuckPermsHandler.java
+src/main/java/top/jk33v3rs/velocitydiscordwhitelist/modules/QuickShopHandler.java
+src/main/java/top/jk33v3rs/velocitydiscordwhitelist/modules/VaultHandler.java
+
+# Modules
+src/main/java/top/jk33v3rs/velocitydiscordwhitelist/modules/EventManager.java
+src/main/java/top/jk33v3rs/velocitydiscordwhitelist/modules/RankModule.java
+src/main/java/top/jk33v3rs/velocitydiscordwhitelist/modules/ItemModule.java
+src/main/java/top/jk33v3rs/velocitydiscordwhitelist/modules/CashModule.java
+src/main/java/top/jk33v3rs/velocitydiscordwhitelist/modules/StatsModule.java
+src/main/java/top/jk33v3rs/velocitydiscordwhitelist/modules/RewardsManager.java
+src/main/java/top/jk33v3rs/velocitydiscordwhitelist/modules/ShopManager.java
+
+# Project specific
+/src/main/java/top/jk33v3rs/velocitydiscordwhitelist/modules/DiscordRewards/
+/src/main/java/top/jk33v3rs/velocitydiscordwhitelist/modules/DiscordRewards/**

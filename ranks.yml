@@ -1,0 +1,128 @@
+# Ranks Configuration for VelocityDiscordWhitelist
+# 25 Main Ranks × 7 Sub-Ranks = 175 Total Rank Positions
+# All progression based on single XP pool (no separate time requirements)
+
+# Sub-rank prefixes (applied to all main ranks)
+sub_ranks:
+  1:
+    name: "Novice"
+    xp_multiplier: 1.0
+  2:
+    name: "Apprentice" 
+    xp_multiplier: 1.2
+  3:
+    name: "Adept"
+    xp_multiplier: 1.4
+  4:
+    name: "Master"
+    xp_multiplier: 1.6
+  5:
+    name: "Heroic"
+    xp_multiplier: 1.8
+  6:
+    name: "Mythic"
+    xp_multiplier: 2.0
+  7:
+    name: "Immortal"
+    xp_multiplier: 2.2
+
+# Main ranks (25 total)
+main_ranks:
+  1:
+    name: "bystander"
+    base_xp: 100
+  2:
+    name: "onlooker"
+    base_xp: 250
+  3:
+    name: "wanderer"
+    base_xp: 500
+  4:
+    name: "traveller"
+    base_xp: 800
+  5:
+    name: "explorer"
+    base_xp: 1200
+  6:
+    name: "adventurer"
+    base_xp: 1800
+  7:
+    name: "surveyor"
+    base_xp: 2500
+  8:
+    name: "navigator"
+    base_xp: 3500
+  9:
+    name: "journeyman"
+    base_xp: 5000
+  10:
+    name: "pathfinder"
+    base_xp: 7000
+  11:
+    name: "trailblazer"
+    base_xp: 10000
+  12:
+    name: "pioneer"
+    base_xp: 14000
+  13:
+    name: "craftsman"
+    base_xp: 19000
+  14:
+    name: "specialist"
+    base_xp: 25000
+  15:
+    name: "artisan"
+    base_xp: 32000
+  16:
+    name: "veteran"
+    base_xp: 40000
+  17:
+    name: "sage"
+    base_xp: 50000
+  18:
+    name: "luminary"
+    base_xp: 62000
+  19:
+    name: "titan"
+    base_xp: 76000
+  20:
+    name: "legend"
+    base_xp: 92000
+  21:
+    name: "eternal"
+    base_xp: 110000
+  22:
+    name: "ascendant"
+    base_xp: 130000
+  23:
+    name: "celestial"
+    base_xp: 152000
+  24:
+    name: "divine"
+    base_xp: 176000
+  25:
+    name: "deity"
+    base_xp: 200000
+
+# XP Sources and Values
+xp_sources:
+  playtime:
+    xp_per_minute: 1
+    exclude_afk: true
+    afk_threshold_minutes: 5
+  chat:
+    xp_per_message: 2
+    cooldown_seconds: 10
+    daily_cap: 200
+  advancements:
+    base_xp: 25
+    scaling_factor: 1.5
+    bonus_for_rare: 50
+  events:
+    login: 5
+    first_join: 50
+    vote: 10
+
+# Progression calculation: base_xp × sub_rank_multiplier
+# Example: bystander.7 (Immortal) = 100 × 2.2 = 220 XP required
+# Example: deity.7 (Immortal) = 200000 × 2.2 = 440000 XP required
