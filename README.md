@@ -1,4 +1,4 @@
-# VelocityDiscordWhitelist v1.0.0
+# VelocityDiscordWhitelist v1.0.1
 
 A powerful Velocity Proxy plugin for managing Minecraft whitelists with Discord integration, advanced player verification, and comprehensive reward systems.
 
@@ -38,12 +38,11 @@ A powerful Velocity Proxy plugin for managing Minecraft whitelists with Discord 
 - **Discord bot token** (for Discord integration)
 
 ### Quick Setup
-1. **Install Spicord** first - [Download here](https://github.com/Spicord/Spicord/releases)
-2. **Download** VelocityDiscordWhitelist from [Releases](https://github.com/jk33v3rs/VelocityDiscordWhitelist/releases)
-3. **Place both JARs** in your Velocity `plugins` directory
-4. **Start** the server once to generate configuration files
-5. **Configure** your database and Discord bot (see Configuration section)
-6. **Restart** the server
+1. **Download** VelocityDiscordWhitelist from [Releases](https://github.com/jk33v3rs/VelocityDiscordWhitelist/releases)
+2. **Place the JAR** in your Velocity `plugins` directory
+3. **Start** the server once to generate configuration files
+4. **Configure** your database and Discord bot (see Configuration section)
+5. **Restart** the server
 
 ### Key Features
 - **Multi-database Support**: MySQL/MariaDB, PostgreSQL, SQLite with HikariCP connection pooling
@@ -111,7 +110,7 @@ cd VelocityDiscordWhitelist
 # Build the plugin (creates shaded JAR with all dependencies)
 ./gradlew shadowJar
 
-# The compiled JAR will be in build/libs/VelocityDiscordWhitelist-1.0.0-all.jar
+# The compiled JAR will be in build/libs/VelocityDiscordWhitelist-1.0.1-all.jar
 ```
 
 ### Development Commands
@@ -130,8 +129,8 @@ cd VelocityDiscordWhitelist
 ```
 
 ### Build Output
-- **Production JAR**: `build/libs/VelocityDiscordWhitelist-1.0.0-all.jar` (~20MB with JDA)
-- **Dev JAR**: `build/libs/VelocityDiscordWhitelist-1.0.0.jar` (without dependencies)
+- **Production JAR**: `build/libs/VelocityDiscordWhitelist-1.0.1-all.jar` (~12MB optimized with JDA)
+- **Dev JAR**: `build/libs/VelocityDiscordWhitelist-1.0.1.jar` (without dependencies)
 
 ---
 
@@ -142,7 +141,7 @@ cd VelocityDiscordWhitelist
 <dependency>
     <groupId>top.jk33v3rs</groupId>
     <artifactId>VelocityDiscordWhitelist</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <scope>provided</scope>
 </dependency>
 ```

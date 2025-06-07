@@ -3,7 +3,7 @@ plugins {
     id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
-version = '1.0.0'
+version = '1.0.2'
 
 repositories {
     mavenCentral()
@@ -39,12 +39,12 @@ dependencies {
     implementation 'org.mariadb.jdbc:mariadb-java-client:3.3.3'
     implementation 'org.bstats:bstats-velocity:3.1.0'
     implementation 'org.xerial:sqlite-jdbc:3.44.1.0'
-    implementation 'net.dv8tion:JDA:5.0.0-beta.21'    
+    implementation 'net.dv8tion:JDA:5.0.0-beta.21'
     implementation 'com.zaxxer:HikariCP:5.1.0'
     compileOnly 'net.milkbowl.vault:VaultUnlockedAPI:2.10'
     implementation 'org.yaml:snakeyaml:2.2'
-    compileOnly 'org.slf4j:slf4j-api:2.0.12'
-    compileOnly 'ch.qos.logback:logback-classic:1.4.11'
+    implementation 'org.slf4j:slf4j-api:2.0.12'
+    implementation 'org.slf4j:slf4j-simple:2.0.12'
 }
 
 shadowJar {
@@ -52,9 +52,10 @@ shadowJar {
     relocate 'org.bstats', 'top.jk33v3rs.velocitydiscordwhitelist.bstats'
     relocate 'org.yaml.snakeyaml', 'top.jk33v3rs.velocitydiscordwhitelist.yaml'
     relocate 'org.sqlite', 'top.jk33v3rs.velocitydiscordwhitelist.sqlite'
-    relocate 'org.mariadb.jdbc', 'top.jk33v3rs.velocitydiscordwhitelist.mariadb.jdbc'    
+    relocate 'org.mariadb.jdbc', 'top.jk33v3rs.velocitydiscordwhitelist.mariadb.jdbc'
     relocate 'com.zaxxer.hikari', 'top.jk33v3rs.velocitydiscordwhitelist.hikari'
     relocate 'net.dv8tion.jda', 'top.jk33v3rs.velocitydiscordwhitelist.jda'
+    relocate 'org.slf4j', 'top.jk33v3rs.velocitydiscordwhitelist.slf4j'
     
     // Exclude unnecessary components to reduce size
     exclude 'META-INF/versions/**'
@@ -62,8 +63,6 @@ shadowJar {
     exclude 'META-INF/NOTICE*'
     exclude 'META-INF/maven/**'
     exclude '**/module-info.class'
-    exclude 'org/slf4j/**'
-    exclude 'ch/qos/logback/**'
     
     // Minimize JDA dependencies - exclude unused audio/voice components
     exclude 'net/dv8tion/jda/api/audio/**'

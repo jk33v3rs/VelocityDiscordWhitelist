@@ -1,6 +1,6 @@
 // VelocityDiscordWhitelist - MIT License
 
-// VelocityDiscordWhitelist v1.0.0
+// VelocityDiscordWhitelist v1.0.2
 // Author: jk33v3rs based on the plugin VelocityWhitelist by Rathinosk
 // Portions of code used are used under MIT licence
 // DISCLAIMER: AI tools were used in the IDE used to create this plugin, which included direct (but supervised) access to code
@@ -15,7 +15,6 @@ import com.velocitypowered.api.event.connection.LoginEvent;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
 import com.velocitypowered.api.plugin.Plugin;
-import com.velocitypowered.api.plugin.Dependency;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
@@ -42,21 +41,17 @@ import top.jk33v3rs.velocitydiscordwhitelist.utils.LoggingUtils;
 @Plugin(
         id = "velocitydiscordwhitelist",
         name = "VelocityDiscordWhitelist",
-        version = "1.0.0",
+        version = "1.0.2",
         url = "https://github.com/jk33v3rs/VelocityDiscordWhitelist",
         description = "A whitelist plugin for Velocity that integrates with Discord",
-        authors = {"jk33v3rs"},
-        dependencies = {
-            @Dependency(id = "slf4j-api")
-        }
+        authors = {"jk33v3rs"}
 )
 public class VelocityDiscordWhitelist {
     private final ProxyServer server;
     private final org.slf4j.Logger logger;
     private final Path dataDirectory;
     private final Path configFile;
-    private final Metrics.Factory metricsFactory;
-      // Components
+    private final Metrics.Factory metricsFactory;      // Components
     private SQLHandler sqlHandler;
     private YamlConfigLoader configLoader;
     private Map<String, Object> config;
@@ -64,6 +59,7 @@ public class VelocityDiscordWhitelist {
     private EnhancedPurgatoryManager purgatoryManager;
     private DiscordBotHandler discordBotHandler;
     private RewardsHandler rewardsHandler;
+    private XPManager xpManager;
     private BrigadierCommandHandler commandHandler;
     private VaultIntegration vaultIntegration;
     private LuckPermsIntegration luckPermsIntegration;
@@ -73,10 +69,11 @@ public class VelocityDiscordWhitelist {
     private final AtomicBoolean pluginEnabled = new AtomicBoolean(false);
     private Boolean debugEnabled = false;
     private int sessionTimeoutMinutes = 30; // Default value
-    
-    // JSON configurations
+      // JSON configurations
     private JsonObject ranksConfig;
-    private JsonObject rewardsConfig;    @Inject
+    private JsonObject rewardsConfig;
+    
+    @Inject
     public VelocityDiscordWhitelist(
             ProxyServer server,
             org.slf4j.Logger logger,
@@ -148,7 +145,11 @@ public class VelocityDiscordWhitelist {
                         rewardsHandler = new RewardsHandler(sqlHandler, discordBotHandler, logger, debugEnabled.booleanValue(), config, vaultIntegration, luckPermsIntegration);
                         purgatoryManager = new EnhancedPurgatoryManager(logger, debugEnabled.booleanValue(), sqlHandler, sessionTimeoutMinutes);
                         
-                        // Initialize command handler                        commandHandler = new BrigadierCommandHandler(server, logger, purgatoryManager, debugEnabled);
+                        // Initialize XP manager
+                        xpManager = new XPManager(sqlHandler, logger, debugEnabled.booleanValue(), config);
+                        
+                        // Initialize command handler with all required dependencies
+                        commandHandler = new BrigadierCommandHandler(server, logger, purgatoryManager, rewardsHandler, xpManager, sqlHandler, debugEnabled.booleanValue());
                         commandHandler.registerCommands();
                         
                         // Start purgatory cleanup task
@@ -164,7 +165,13 @@ public class VelocityDiscordWhitelist {
                 logger.info("Discord bot is disabled in configuration");
                 initializeIntegrations();
                 rewardsHandler = new RewardsHandler(sqlHandler, null, logger, debugEnabled.booleanValue(), config, vaultIntegration, luckPermsIntegration);
-                purgatoryManager = new EnhancedPurgatoryManager(logger, debugEnabled.booleanValue(), sqlHandler, sessionTimeoutMinutes);                commandHandler = new BrigadierCommandHandler(server, logger, purgatoryManager, debugEnabled);
+                purgatoryManager = new EnhancedPurgatoryManager(logger, debugEnabled.booleanValue(), sqlHandler, sessionTimeoutMinutes);
+                
+                // Initialize XP manager
+                xpManager = new XPManager(sqlHandler, logger, debugEnabled.booleanValue(), config);
+                
+                // Initialize command handler with all required dependencies
+                commandHandler = new BrigadierCommandHandler(server, logger, purgatoryManager, rewardsHandler, xpManager, sqlHandler, debugEnabled.booleanValue());
                 commandHandler.registerCommands();
                 pluginEnabled.set(true);
             }
@@ -351,18 +358,22 @@ public class VelocityDiscordWhitelist {
             debugLog("LuckPerms integration not available or disabled");
         }
         
-        // Initialize Vault integration (placeholder for now since Vault API needs to be obtained from Bukkit)
-        // In a proxy environment, Vault integration would typically be handled differently
-        // This is a placeholder for future server-specific implementation
-        vaultIntegration = null;
-        
+        // Initialize Vault integration
+        vaultIntegration = new VaultIntegration(server, logger, debugEnabled, config);
         Map<String, Object> vaultConfig = (Map<String, Object>) config.getOrDefault("vault", Map.of());
         boolean vaultEnabled = Boolean.parseBoolean(vaultConfig.getOrDefault("enabled", "false").toString());
         
         if (vaultEnabled) {
-            debugLog("Vault integration configuration detected but requires server-specific setup");
+            if (vaultIntegration.isEconomyAvailable() || vaultIntegration.isPermissionsAvailable()) {
+                logger.info("Vault integration enabled - Economy: {}, Permissions: {}", 
+                    vaultIntegration.isEconomyAvailable(), vaultIntegration.isPermissionsAvailable());
+            } else {
+                debugLog("Vault integration configured but target server not available");
+            }
+        } else {
+            debugLog("Vault integration disabled in configuration");
         }
-    }    // Getters for components
+    }// Getters for components
     
     public SQLHandler getSqlHandler() {
         return sqlHandler;

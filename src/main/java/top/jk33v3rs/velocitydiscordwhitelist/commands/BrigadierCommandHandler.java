@@ -1,6 +1,5 @@
 package top.jk33v3rs.velocitydiscordwhitelist.commands;
 
-import com.google.inject.Inject;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.tree.LiteralCommandNode;
@@ -13,32 +12,64 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.slf4j.Logger;
 import top.jk33v3rs.velocitydiscordwhitelist.modules.EnhancedPurgatoryManager;
+import top.jk33v3rs.velocitydiscordwhitelist.modules.RewardsHandler;
+import top.jk33v3rs.velocitydiscordwhitelist.modules.XPManager;
+import top.jk33v3rs.velocitydiscordwhitelist.database.SQLHandler;
 import com.velocitypowered.api.command.CommandManager;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-/** Handles Minecraft verification commands (/verify only). */
+/** Handles Minecraft commands including /verify, /rank, /xpchart, and VWL admin commands. */
 public class BrigadierCommandHandler {
     private final ProxyServer server;
     private final Logger logger;
     private final EnhancedPurgatoryManager purgatoryManager;
+    private final RewardsHandler rewardsHandler;
+    private final XPManager xpManager;
+    private final SQLHandler sqlHandler;
     private final boolean debugEnabled;
 
-    @Inject
-    public BrigadierCommandHandler(ProxyServer server, Logger logger, EnhancedPurgatoryManager purgatoryManager, boolean debugEnabled) {
+    /**
+     * Constructor for BrigadierCommandHandler
+     * Initializes the command handler with required dependencies and registers all VWL commands.
+     * 
+     * @param server The ProxyServer instance for command registration
+     * @param logger The Logger instance for logging command activities
+     * @param purgatoryManager The EnhancedPurgatoryManager for verification command functionality
+     * @param rewardsHandler The RewardsHandler for rank command functionality
+     * @param xpManager The XPManager for XP chart command functionality
+     * @param sqlHandler The SQLHandler for whitelist database operations
+     * @param debugEnabled Whether debug logging is enabled
+     */
+    public BrigadierCommandHandler(ProxyServer server, Logger logger, EnhancedPurgatoryManager purgatoryManager, 
+                                 RewardsHandler rewardsHandler, XPManager xpManager, SQLHandler sqlHandler, boolean debugEnabled) {
         this.server = server;
         this.logger = logger;
         this.purgatoryManager = purgatoryManager;
+        this.rewardsHandler = rewardsHandler;
+        this.xpManager = xpManager;
+        this.sqlHandler = sqlHandler;
         this.debugEnabled = debugEnabled;
         registerCommands();
     }
 
+    /**
+     * debugLog method
+     * Logs debug messages when debug mode is enabled.
+     * 
+     * @param message The debug message to log
+     */
     private void debugLog(String message) {
         if (debugEnabled) {
             logger.info("[BrigadierCommandHandler] " + message);
         }
     }
 
+    /**
+     * registerCommands method
+     * Registers all VWL commands with the Velocity command manager.
+     * Includes /verify, /rank, /xpchart, and VWL admin commands.
+     */
     public void registerCommands() {
         CommandManager commandManager = server.getCommandManager();
 
@@ -48,6 +79,28 @@ public class BrigadierCommandHandler {
         BrigadierCommand verifyCommand = createVerifyCommand();
         commandManager.register(verifyMeta, verifyCommand);
         debugLog("Registered /verify command");
+
+        // Register /rank command
+        CommandMeta rankMeta = commandManager.metaBuilder("rank")
+            .build();
+        BrigadierCommand rankCommand = createRankCommand();
+        commandManager.register(rankMeta, rankCommand);
+        debugLog("Registered /rank command");
+
+        // Register /xpchart command
+        CommandMeta xpChartMeta = commandManager.metaBuilder("xpchart")
+            .build();
+        BrigadierCommand xpChartCommand = createXPChartCommand();
+        commandManager.register(xpChartMeta, xpChartCommand);
+        debugLog("Registered /xpchart command");
+
+        // Register /vwl admin command
+        CommandMeta vwlMeta = commandManager.metaBuilder("vwl")
+            .aliases("velocitywhitelist")
+            .build();
+        BrigadierCommand vwlCommand = createVWLCommand();
+        commandManager.register(vwlMeta, vwlCommand);
+        debugLog("Registered /vwl admin command");
     }
 
     private BrigadierCommand createVerifyCommand() {
@@ -144,5 +197,159 @@ public class BrigadierCommandHandler {
             .build();
 
         return new BrigadierCommand(verifyNode);
+    }
+
+    /**
+     * createRankCommand method
+     * Creates the BrigadierCommand for the /rank command.
+     * Allows players to check their rank progress and statistics.
+     * 
+     * @return The BrigadierCommand instance for /rank
+     */
+    private BrigadierCommand createRankCommand() {
+        RankCommand rankCommand = new RankCommand(rewardsHandler, xpManager, logger);
+        return rankCommand.createCommand();
+    }
+
+    /**
+     * createXPChartCommand method
+     * Creates the BrigadierCommand for the /xpchart command.
+     * Allows players to view XP progression charts and information.
+     * 
+     * @return The BrigadierCommand instance for /xpchart
+     */
+    private BrigadierCommand createXPChartCommand() {
+        XPChartCommand xpChartCommand = new XPChartCommand();
+        return xpChartCommand.createCommand();
+    }
+
+    /**
+     * createVWLCommand method
+     * Creates the BrigadierCommand for the /vwl admin command.
+     * Provides admin functionality for managing the whitelist.
+     * 
+     * @return The BrigadierCommand instance for /vwl
+     */
+    private BrigadierCommand createVWLCommand() {
+        LiteralCommandNode<CommandSource> vwlNode = BrigadierCommand.literalArgumentBuilder("vwl")
+            .requires(source -> source.hasPermission("velocitywhitelist.admin"))
+            .then(BrigadierCommand.literalArgumentBuilder("add")
+                .then(BrigadierCommand.requiredArgumentBuilder("player", StringArgumentType.word())
+                    .executes(context -> {
+                        CommandSource source = context.getSource();
+                        String playerName = context.getArgument("player", String.class);
+                        
+                        debugLog("Admin " + source + " adding player " + playerName + " to whitelist");
+                        
+                        sqlHandler.addPlayerToWhitelist(playerName, null)
+                            .thenRun(() -> {
+                                source.sendMessage(Component.text("Successfully added " + playerName + " to the whitelist.", NamedTextColor.GREEN));
+                                debugLog("Successfully added " + playerName + " to whitelist");
+                            })
+                            .exceptionally(ex -> {
+                                source.sendMessage(Component.text("Error adding player to whitelist: " + ex.getMessage(), NamedTextColor.RED));
+                                logger.error("Error adding player to whitelist", ex);
+                                return null;
+                            });
+                        
+                        return Command.SINGLE_SUCCESS;
+                    })))
+            .then(BrigadierCommand.literalArgumentBuilder("del")
+                .then(BrigadierCommand.requiredArgumentBuilder("player", StringArgumentType.word())
+                    .executes(context -> {
+                        CommandSource source = context.getSource();
+                        String playerName = context.getArgument("player", String.class);
+                        
+                        debugLog("Admin " + source + " removing player " + playerName + " from whitelist");
+                        
+                        sqlHandler.removePlayerFromWhitelist(playerName)
+                            .thenRun(() -> {
+                                source.sendMessage(Component.text("Successfully removed " + playerName + " from the whitelist.", NamedTextColor.GREEN));
+                                debugLog("Successfully removed " + playerName + " from whitelist");
+                            })
+                            .exceptionally(ex -> {
+                                source.sendMessage(Component.text("Error removing player from whitelist: " + ex.getMessage(), NamedTextColor.RED));
+                                logger.error("Error removing player from whitelist", ex);
+                                return null;
+                            });
+                        
+                        return Command.SINGLE_SUCCESS;
+                    })))
+            .then(BrigadierCommand.literalArgumentBuilder("list")
+                .executes(context -> {
+                    CommandSource source = context.getSource();
+                    
+                    debugLog("Admin " + source + " requesting whitelist");
+                    
+                    sqlHandler.listWhitelistedPlayers(null)
+                        .thenAccept(players -> {
+                            if (players.isEmpty()) {
+                                source.sendMessage(Component.text("The whitelist is empty.", NamedTextColor.YELLOW));
+                            } else {
+                                source.sendMessage(Component.text("Whitelisted players (" + players.size() + "):", NamedTextColor.GREEN));
+                                for (String player : players) {
+                                    source.sendMessage(Component.text("- " + player, NamedTextColor.WHITE));
+                                }
+                            }
+                        })
+                        .exceptionally(ex -> {
+                            source.sendMessage(Component.text("Error listing whitelisted players: " + ex.getMessage(), NamedTextColor.RED));
+                            logger.error("Error listing whitelisted players", ex);
+                            return null;
+                        });
+                    
+                    return Command.SINGLE_SUCCESS;
+                })
+                .then(BrigadierCommand.requiredArgumentBuilder("search", StringArgumentType.word())
+                    .executes(context -> {
+                        CommandSource source = context.getSource();
+                        String search = context.getArgument("search", String.class);
+                        
+                        debugLog("Admin " + source + " searching whitelist for: " + search);
+                        
+                        sqlHandler.listWhitelistedPlayers(search)
+                            .thenAccept(players -> {
+                                if (players.isEmpty()) {
+                                    source.sendMessage(Component.text("No whitelisted players found matching '" + search + "'.", NamedTextColor.YELLOW));
+                                } else {
+                                    source.sendMessage(Component.text("Whitelisted players matching '" + search + "' (" + players.size() + "):", NamedTextColor.GREEN));
+                                    for (String player : players) {
+                                        source.sendMessage(Component.text("- " + player, NamedTextColor.WHITE));
+                                    }
+                                }
+                            })
+                            .exceptionally(ex -> {
+                                source.sendMessage(Component.text("Error searching whitelisted players: " + ex.getMessage(), NamedTextColor.RED));
+                                logger.error("Error searching whitelisted players", ex);
+                                return null;
+                            });
+                        
+                        return Command.SINGLE_SUCCESS;
+                    })))
+            .then(BrigadierCommand.literalArgumentBuilder("reload")
+                .executes(context -> {
+                    CommandSource source = context.getSource();
+                    
+                    debugLog("Admin " + source + " attempting configuration reload");
+                    
+                    // Note: Configuration reload requires restarting the plugin or proxy
+                    // A full implementation would need access to the main plugin instance
+                    source.sendMessage(Component.text("Configuration reload is not implemented yet.", NamedTextColor.YELLOW));
+                    source.sendMessage(Component.text("Please restart the proxy to reload configuration changes.", NamedTextColor.GRAY));
+                    
+                    return Command.SINGLE_SUCCESS;
+                }))
+            .executes(context -> {
+                CommandSource source = context.getSource();
+                source.sendMessage(Component.text("VWL Commands:", NamedTextColor.GOLD));
+                source.sendMessage(Component.text("/vwl add <player> - Add player to whitelist", NamedTextColor.WHITE));
+                source.sendMessage(Component.text("/vwl del <player> - Remove player from whitelist", NamedTextColor.WHITE));
+                source.sendMessage(Component.text("/vwl list [search] - List whitelisted players", NamedTextColor.WHITE));
+                source.sendMessage(Component.text("/vwl reload - Reload configuration", NamedTextColor.WHITE));
+                return Command.SINGLE_SUCCESS;
+            })
+            .build();
+
+        return new BrigadierCommand(vwlNode);
     }
 }

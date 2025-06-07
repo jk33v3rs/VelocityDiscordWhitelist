@@ -1,0 +1,39 @@
+# VelocityDiscordWhitelist Configuration v1.0.2
+# Database Configuration
+database:
+  host: "localhost"
+  port: 3306
+  database: "whitelist"
+  username: "root"
+  password: "password"
+  pool:
+    maximum-pool-size: 10
+    minimum-idle: 5
+    connection-timeout: 30000
+
+# Discord Bot Configuration (set enabled: false to disable Discord integration)
+discord:
+  enabled: true
+  token: "your-bot-token-here"
+  guild-id: "your-guild-id-here"
+  channel-id: "your-channel-id-here"
+  roles:
+    whitelisted: "your-whitelisted-role-id"
+    admin: "your-admin-role-id"
+
+# Plugin Settings
+settings:
+  debug: false
+  kick-non-whitelisted: true
+  purgatory-enabled: true
+  purgatory-cleanup-minutes: 5
+
+# Messages
+messages:
+  prefix: "&8[&bWhitelist&8]&r "
+  not-whitelisted: "&cYou are not whitelisted on this server!"
+  no-permission: "&cYou don't have permission to use this command!"
+  whitelist-added: "&aYou have been whitelisted!"
+  whitelist-removed: "&cYou have been removed from the whitelist!"
+  already-whitelisted: "&eYou are already whitelisted!"
+  player-not-found: "&cPlayer not found!"
