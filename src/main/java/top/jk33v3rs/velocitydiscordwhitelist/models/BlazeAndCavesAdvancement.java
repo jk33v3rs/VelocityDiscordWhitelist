@@ -204,25 +204,14 @@ public class BlazeAndCavesAdvancement {
      */
     public int getFinalXP(double easyMultiplier, double mediumMultiplier, double hardMultiplier, 
                          double insaneMultiplier, double terralithBonus, double hardcoreBonus) {
-        double finalXP = baseXP;
-        
-        // Apply difficulty multipliers
-        switch (difficulty.toLowerCase()) {
-            case "easy":
-                finalXP = baseXP * easyMultiplier;
-                break;
-            case "medium":
-                finalXP = baseXP * mediumMultiplier;
-                break;
-            case "hard":
-                finalXP = baseXP * hardMultiplier;
-                break;
-            case "insane":
-                finalXP = baseXP * insaneMultiplier;
-                break;
-            default:
-                finalXP = baseXP;
-        }
+        // Apply difficulty multipliers using modern switch expression
+        double finalXP = baseXP * switch (difficulty.toLowerCase()) {
+            case "easy" -> easyMultiplier;
+            case "medium" -> mediumMultiplier;
+            case "hard" -> hardMultiplier;
+            case "insane" -> insaneMultiplier;
+            default -> 1.0;
+        };
         
         // Apply variant bonuses
         if (isTerralithVariant) {

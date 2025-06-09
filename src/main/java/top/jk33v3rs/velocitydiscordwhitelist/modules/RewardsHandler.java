@@ -1,20 +1,21 @@
 package top.jk33v3rs.velocitydiscordwhitelist.modules;
 
-import org.slf4j.Logger;
-import top.jk33v3rs.velocitydiscordwhitelist.database.SQLHandler;
-import top.jk33v3rs.velocitydiscordwhitelist.models.PlayerRank;
-import top.jk33v3rs.velocitydiscordwhitelist.models.RankDefinition;
-import top.jk33v3rs.velocitydiscordwhitelist.models.RankRewards;
-import top.jk33v3rs.velocitydiscordwhitelist.integrations.VaultIntegration;
-import top.jk33v3rs.velocitydiscordwhitelist.integrations.LuckPermsIntegration;
-import top.jk33v3rs.velocitydiscordwhitelist.utils.LoggingUtils;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+
+import org.slf4j.Logger;
+
+import top.jk33v3rs.velocitydiscordwhitelist.database.SQLHandler;
+import top.jk33v3rs.velocitydiscordwhitelist.integrations.LuckPermsIntegration;
+import top.jk33v3rs.velocitydiscordwhitelist.integrations.VaultIntegration;
+import top.jk33v3rs.velocitydiscordwhitelist.models.PlayerRank;
+import top.jk33v3rs.velocitydiscordwhitelist.models.RankDefinition;
+import top.jk33v3rs.velocitydiscordwhitelist.models.RankRewards;
+import top.jk33v3rs.velocitydiscordwhitelist.utils.LoggingUtils;
 
 
 /**
@@ -26,8 +27,8 @@ public class RewardsHandler {
     private final DiscordBotHandler discordBotHandler;
     private final Logger logger;
     private final boolean debugEnabled;
-    private final Map<String, PlayerRank> playerRanksCache;
-    private final Map<Integer, RankDefinition> rankDefinitionsCache;
+    private final Map<String, PlayerRank> playerRanksCache = new ConcurrentHashMap<>();
+    private final Map<Integer, RankDefinition> rankDefinitionsCache = new ConcurrentHashMap<>();
     private final boolean rewardsEnabled;
     private final boolean ranksEnabled;
     private final VaultIntegration vaultIntegration;
@@ -35,36 +36,48 @@ public class RewardsHandler {
     
     /**
      * Constructor for RewardsHandler
-     * 
+     *
      * @param sqlHandler The SQL handler for database operations
      * @param discordBotHandler The Discord bot handler for role management
      * @param logger The logger instance
      * @param debugEnabled Whether debug logging is enabled
-     * @param config The configuration map
-     * @param vaultIntegration The Vault integration for economy and permissions
-     * @param luckPermsIntegration The LuckPerms integration for advanced permissions
+     * @param config The main configuration map
+     * @param vaultIntegration The Vault integration (can be null)
+     * @param luckPermsIntegration The LuckPerms integration (can be null)
      */
-    @SuppressWarnings("unchecked")
     public RewardsHandler(SQLHandler sqlHandler, DiscordBotHandler discordBotHandler, Logger logger, 
-                         boolean debugEnabled, Map<String, Object> config, VaultIntegration vaultIntegration,
-                         LuckPermsIntegration luckPermsIntegration) {
+                         boolean debugEnabled, Map<String, Object> config, 
+                         VaultIntegration vaultIntegration, LuckPermsIntegration luckPermsIntegration) {
         this.sqlHandler = sqlHandler;
         this.discordBotHandler = discordBotHandler;
         this.logger = logger;
         this.debugEnabled = debugEnabled;
         this.vaultIntegration = vaultIntegration;
         this.luckPermsIntegration = luckPermsIntegration;
-        this.playerRanksCache = new ConcurrentHashMap<>();
-        this.rankDefinitionsCache = new ConcurrentHashMap<>();
         
-        // Get rewards configuration
-        Map<String, Object> rewardsConfig = (Map<String, Object>) config.getOrDefault("rewards", new ConcurrentHashMap<>());
-        this.rewardsEnabled = Boolean.parseBoolean(rewardsConfig.getOrDefault("enabled", "false").toString());
-        this.ranksEnabled = Boolean.parseBoolean(rewardsConfig.getOrDefault("ranksEnabled", "false").toString());
+        // Parse configuration settings
+        @SuppressWarnings("unchecked")
+        Map<String, Object> rewardsConfig = (Map<String, Object>) config.getOrDefault("rewards", new java.util.HashMap<>());
+        this.rewardsEnabled = Boolean.parseBoolean(rewardsConfig.getOrDefault("enabled", "true").toString());
         
-        // Initialize rank definitions from database only if ranks are enabled
-        if (ranksEnabled) {
-            loadRankDefinitions();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> ranksConfig = (Map<String, Object>) config.getOrDefault("ranks", new java.util.HashMap<>());
+        this.ranksEnabled = Boolean.parseBoolean(ranksConfig.getOrDefault("enabled", "true").toString());
+        
+        // Initialize rank definitions after all fields are set
+        initializeRankDefinitions();
+    }
+    
+    /**
+     * initializeRankDefinitions
+     * Initializes rank definitions in a way that's safe to call from constructor.
+     * This method is private and final to prevent override issues.
+     */
+    private void initializeRankDefinitions() {
+        try {
+            this.loadRankDefinitions();
+        } catch (RuntimeException e) {
+            logger.error("Failed to load rank definitions during initialization", e);
         }
     }
     
@@ -108,56 +121,79 @@ public class RewardsHandler {
             
             CompletableFuture<PlayerRank> future = new CompletableFuture<>();
             
-            try {
-                Optional<PlayerRank> optionalRank = sqlHandler.getPlayerRank(playerUuid).get();
-                if (optionalRank.isPresent()) {
-                    PlayerRank rank = optionalRank.get();
-                    
-                    // Validate and correct rank data to ensure it follows the official subrank progression
-                    if (!rank.validateAndCorrectRankData()) {
-                        debugLog("Invalid rank data for player " + playerUuid + ", using default rank");
-                        // Create default rank for players with completely invalid data
-                        rank = new PlayerRank(
+            // Get player rank from database asynchronously
+            sqlHandler.getPlayerRank(playerUuid).thenAccept(optionalRank -> {
+                try {
+                    if (optionalRank.isPresent()) {
+                        PlayerRank rank = optionalRank.get();
+                        
+                        // Validate and correct rank data to ensure it follows the official subrank progression
+                        if (!rank.validateAndCorrectRankData()) {
+                            debugLog("Invalid rank data for player " + playerUuid + ", using default rank");
+                            // Create default rank for players with completely invalid data
+                            PlayerRank correctedRank = new PlayerRank(
+                                playerUuid,
+                                1, // Default main rank (bystander - first in official progression)
+                                1, // Default sub rank (novice)
+                                rank.getJoinDate() != null ? rank.getJoinDate() : Instant.now(),
+                                rank.getPlayTimeMinutes(),
+                                rank.getAchievementsCompleted(),
+                                rank.getLastPromotion()
+                            );
+                            // Save the corrected rank
+                            sqlHandler.savePlayerRank(correctedRank).thenAccept(success -> {
+                                if (success) {
+                                    playerRanksCache.put(playerUuid, correctedRank);
+                                    future.complete(correctedRank);
+                                } else {
+                                    logger.error("Failed to save corrected rank for " + playerUuid);
+                                    future.completeExceptionally(new RuntimeException("Failed to save corrected rank"));
+                                }
+                            }).exceptionally(ex -> {
+                                logger.error("Error saving corrected rank for " + playerUuid, ex);
+                                future.completeExceptionally(ex);
+                                return null;
+                            });
+                        } else {
+                            playerRanksCache.put(playerUuid, rank);
+                            future.complete(rank);
+                        }
+                    } else {
+                        // No rank found, create default with official subrank system
+                        PlayerRank defaultRank = new PlayerRank(
                             playerUuid,
                             1, // Default main rank (bystander - first in official progression)
-                            1, // Default sub rank (novice)
-                            rank.getJoinDate() != null ? rank.getJoinDate() : Instant.now(),
-                            rank.getPlayTimeMinutes(),
-                            rank.getAchievementsCompleted(),
-                            rank.getLastPromotion()
+                            1, // Default sub rank (novice - first in progression)
+                            Instant.now(),
+                            0, // Default play time
+                            0, // Default achievements
+                            null // No last promotion
                         );
-                        // Save the corrected rank
-                        sqlHandler.savePlayerRank(rank);
+                        
+                        // Save the default rank to database
+                        sqlHandler.savePlayerRank(defaultRank).thenAccept(success -> {
+                            if (success) {
+                                playerRanksCache.put(playerUuid, defaultRank);
+                                future.complete(defaultRank);
+                            } else {
+                                logger.error("Failed to save default player rank for " + playerUuid);
+                                future.completeExceptionally(new RuntimeException("Failed to save default rank"));
+                            }
+                        }).exceptionally(ex -> {
+                            logger.error("Error saving default player rank for " + playerUuid, ex);
+                            future.completeExceptionally(ex);
+                            return null;
+                        });
                     }
-                    
-                    playerRanksCache.put(playerUuid, rank);
-                    future.complete(rank);
-                } else {
-                    // No rank found, create default with official subrank system
-                    PlayerRank defaultRank = new PlayerRank(
-                        playerUuid,
-                        1, // Default main rank (bystander - first in official progression)
-                        1, // Default sub rank (novice - first in progression)
-                        Instant.now(),
-                        0, // Default play time
-                        0, // Default achievements
-                        null // No last promotion
-                    );
-                    
-                    // Save the default rank to database
-                    try {
-                        sqlHandler.savePlayerRank(defaultRank);
-                        playerRanksCache.put(playerUuid, defaultRank);
-                        future.complete(defaultRank);
-                    } catch (Exception e) {
-                        logger.error("Failed to save default player rank for " + playerUuid, e);
-                        future.completeExceptionally(e);
-                    }
+                } catch (Exception e) {
+                    logger.error("Error processing player rank result for " + playerUuid, e);
+                    future.completeExceptionally(e);
                 }
-            } catch (Exception e) {
+            }).exceptionally(e -> {
                 logger.error("Failed to get player rank for " + playerUuid, e);
                 future.completeExceptionally(e);
-            }
+                return null;
+            });
             
             return future;
         } catch (IllegalStateException e) {
@@ -369,7 +405,7 @@ public class RewardsHandler {
                     CompletableFuture<Boolean> updateResult = discordBotHandler.updateMemberRoles(
                         discordUserId,
                         state,
-                        rankDef != null ? String.valueOf(rankDef.getDiscordRoleId()) : null
+                        String.valueOf(rankDef.getDiscordRoleId())
                     );
                     
                     updateResult.thenAccept(success -> {

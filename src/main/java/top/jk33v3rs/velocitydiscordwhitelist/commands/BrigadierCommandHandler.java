@@ -1,23 +1,26 @@
 package top.jk33v3rs.velocitydiscordwhitelist.commands;
 
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+
+import org.slf4j.Logger;
+
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.velocitypowered.api.command.BrigadierCommand;
+import com.velocitypowered.api.command.CommandManager;
 import com.velocitypowered.api.command.CommandMeta;
 import com.velocitypowered.api.command.CommandSource;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
+
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import org.slf4j.Logger;
+import top.jk33v3rs.velocitydiscordwhitelist.database.SQLHandler;
 import top.jk33v3rs.velocitydiscordwhitelist.modules.EnhancedPurgatoryManager;
 import top.jk33v3rs.velocitydiscordwhitelist.modules.RewardsHandler;
 import top.jk33v3rs.velocitydiscordwhitelist.modules.XPManager;
-import top.jk33v3rs.velocitydiscordwhitelist.database.SQLHandler;
-import com.velocitypowered.api.command.CommandManager;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 
 /** Handles Minecraft commands including /verify, /rank, /xpchart, and VWL admin commands. */
 public class BrigadierCommandHandler {
@@ -31,17 +34,16 @@ public class BrigadierCommandHandler {
 
     /**
      * Constructor for BrigadierCommandHandler
-     * Initializes the command handler with required dependencies and registers all VWL commands.
-     * 
-     * @param server The ProxyServer instance for command registration
-     * @param logger The Logger instance for logging command activities
-     * @param purgatoryManager The EnhancedPurgatoryManager for verification command functionality
-     * @param rewardsHandler The RewardsHandler for rank command functionality
-     * @param xpManager The XPManager for XP chart command functionality
-     * @param sqlHandler The SQLHandler for whitelist database operations
+     *
+     * @param server The Velocity proxy server instance
+     * @param logger The logger for logging messages
+     * @param purgatoryManager The purgatory manager for verification
+     * @param rewardsHandler The rewards handler for rank management
+     * @param xpManager The XP manager for experience tracking
+     * @param sqlHandler The SQL handler for database operations
      * @param debugEnabled Whether debug logging is enabled
      */
-    public BrigadierCommandHandler(ProxyServer server, Logger logger, EnhancedPurgatoryManager purgatoryManager, 
+    public BrigadierCommandHandler(ProxyServer server, Logger logger, EnhancedPurgatoryManager purgatoryManager,
                                  RewardsHandler rewardsHandler, XPManager xpManager, SQLHandler sqlHandler, boolean debugEnabled) {
         this.server = server;
         this.logger = logger;
@@ -50,7 +52,22 @@ public class BrigadierCommandHandler {
         this.xpManager = xpManager;
         this.sqlHandler = sqlHandler;
         this.debugEnabled = debugEnabled;
-        registerCommands();
+        
+        // Initialize commands after all fields are set
+        initializeCommands();
+    }
+    
+    /**
+     * initializeCommands
+     * Initializes command registration in a way that's safe to call from constructor.
+     * This method is private and final to prevent override issues.
+     */
+    private void initializeCommands() {
+        try {
+            this.registerCommands();
+        } catch (RuntimeException e) {
+            logger.error("Failed to register commands during initialization", e);
+        }
     }
 
     /**
@@ -110,82 +127,83 @@ public class BrigadierCommandHandler {
                     CommandSource source = context.getSource();
                     String code = context.getArgument("code", String.class);
 
-                    if (!(source instanceof Player)) {
-                        source.sendMessage(Component.text("This command can only be used by players.", NamedTextColor.RED));
-                        return Command.SINGLE_SUCCESS;
-                    }
+                    if (source instanceof Player player) {
+                        String username = player.getUsername();
 
-                    Player player = (Player) source;
-                    String username = player.getUsername();
+                        debugLog("Player " + username + " attempting verification with code " + code);
 
-                    debugLog("Player " + username + " attempting verification with code " + code);
+                        // Check for active session
+                        Optional<EnhancedPurgatoryManager.PurgatorySession> existingSession = purgatoryManager.getSession(username);
+                        if (existingSession.isEmpty()) {
+                            debugLog("No active session found for player " + username);
+                            source.sendMessage(Component.text("You don't have an active verification session. Please use /mc command in our Discord server to start verification.", NamedTextColor.RED));
+                            return Command.SINGLE_SUCCESS;
+                        }
 
-                    // Check for active session
-                    Optional<EnhancedPurgatoryManager.PurgatorySession> existingSession = purgatoryManager.getSession(username);
-                    if (existingSession.isEmpty()) {
-                        debugLog("No active session found for player " + username);
-                        source.sendMessage(Component.text("You don't have an active verification session. Please use /mc command in our Discord server to start verification.", NamedTextColor.RED));
-                        return Command.SINGLE_SUCCESS;
-                    }
+                        EnhancedPurgatoryManager.PurgatorySession session = existingSession.get();
+                        debugLog("Found session for " + username + " (attempts: " + session.getVerificationAttempts() + ")");
 
-                    EnhancedPurgatoryManager.PurgatorySession session = existingSession.get();
-                    debugLog("Found session for " + username + " (attempts: " + session.getVerificationAttempts() + ")");
-
-                    // Check if session is expired
-                    if (session.isExpired()) {
-                        debugLog("Session expired for player " + username);
-                        source.sendMessage(Component.text("Your verification session has expired. Please use /mc in Discord to get a new code.", NamedTextColor.RED));
-                        purgatoryManager.removeSession(username);
-                        return Command.SINGLE_SUCCESS;
-                    }
-
-                    // Check if code was already used
-                    if (session.isCodeUsed()) {
-                        debugLog("Attempt to use already-used code for player " + username);
-                        source.sendMessage(Component.text("This code has already been used. Please use /mc in Discord to get a new code if needed.", NamedTextColor.RED));
-                        purgatoryManager.removeSession(username);
-                        return Command.SINGLE_SUCCESS;
-                    }
-
-                    // Validate the code
-                    boolean validCode = purgatoryManager.validateCode(username, code);
-                    
-                    if (validCode) {
-                        debugLog("Code validation successful for player " + username);
-                        
-                        // Complete verification
-                        CompletableFuture<Boolean> completionFuture = purgatoryManager.completeVerification(username, player.getUniqueId());
-                        completionFuture.thenAccept(success -> {
-                            if (success) {
-                                source.sendMessage(Component.text("Successfully verified! You can now join the server.", NamedTextColor.GREEN));
-                                debugLog("Player " + username + " successfully verified");
-                                
-                                // Check if Discord was linked
-                                if (session.getDiscordUserId() != null) {
-                                    source.sendMessage(Component.text("Your Minecraft account has been linked to Discord account " + session.getDiscordUsername(), NamedTextColor.GREEN));
-                                    debugLog("Discord account linked: " + session.getDiscordUsername() + " (" + session.getDiscordUserId() + ")");
-                                }
-                            } else {
-                                source.sendMessage(Component.text("An error occurred during verification. Please try again or contact an admin.", NamedTextColor.RED));
-                                debugLog("Failed to complete verification for player " + username);
-                            }
-                        });
-                    } else {
-                        // Handle failed validation
-                        int attemptsLeft = EnhancedPurgatoryManager.PurgatorySession.MAX_VERIFICATION_ATTEMPTS - session.getVerificationAttempts();
-                        debugLog("Validation failed for player " + username + " with code: " + code + " (" + attemptsLeft + " attempts left)");
-
-                        // Check for max attempts
-                        if (session.getVerificationAttempts() >= EnhancedPurgatoryManager.PurgatorySession.MAX_VERIFICATION_ATTEMPTS) {
-                            debugLog("Player " + username + " reached max verification attempts, removing session");
-                            source.sendMessage(Component.text("Too many failed attempts. Please use /mc to start over.", NamedTextColor.RED));
+                        // Check if session is expired
+                        if (session.isExpired()) {
+                            debugLog("Session expired for player " + username);
+                            source.sendMessage(Component.text("Your verification session has expired. Please use /mc in Discord to get a new code.", NamedTextColor.RED));
                             purgatoryManager.removeSession(username);
+                            return Command.SINGLE_SUCCESS;
+                        }
+
+                        // Check if code was already used
+                        if (session.isCodeUsed()) {
+                            debugLog("Attempt to use already-used code for player " + username);
+                            source.sendMessage(Component.text("This code has already been used. Please use /mc in Discord to get a new code if needed.", NamedTextColor.RED));
+                            purgatoryManager.removeSession(username);
+                            return Command.SINGLE_SUCCESS;
+                        }
+
+                        // Validate the code
+                        boolean validCode = purgatoryManager.validateCode(username, code);
+                        
+                        if (validCode) {
+                            debugLog("Code validation successful for player " + username);
+                            
+                            // Complete verification
+                            CompletableFuture<Boolean> completionFuture = purgatoryManager.completeVerification(username, player.getUniqueId());
+                            completionFuture.thenAccept(success -> {
+                                if (success) {
+                                    source.sendMessage(Component.text("Successfully verified! You can now join the server.", NamedTextColor.GREEN));
+                                    debugLog("Player " + username + " successfully verified");
+                                    
+                                    // Check if Discord was linked
+                                    if (session.getDiscordUserId() != null) {
+                                        source.sendMessage(Component.text("Your Minecraft account has been linked to Discord account " + session.getDiscordUsername(), NamedTextColor.GREEN));
+                                        debugLog("Discord account linked: " + session.getDiscordUsername() + " (" + session.getDiscordUserId() + ")");
+                                    }
+                                } else {
+                                    source.sendMessage(Component.text("An error occurred during verification. Please try again or contact an admin.", NamedTextColor.RED));
+                                    debugLog("Failed to complete verification for player " + username);
+                                }
+                            });
                         } else {
-                            source.sendMessage(Component.text("Invalid verification code. Please check the code and try again. (" + attemptsLeft + " attempts remaining)", NamedTextColor.RED));
-                            if (attemptsLeft <= 3) {
-                                source.sendMessage(Component.text("Warning: After " + attemptsLeft + " more failed attempts, you'll need to start over with /mc in Discord", NamedTextColor.GOLD));
+                            // Handle failed validation
+                            int attemptsLeft = EnhancedPurgatoryManager.PurgatorySession.MAX_VERIFICATION_ATTEMPTS - session.getVerificationAttempts();
+                            debugLog("Validation failed for player " + username + " with code: " + code + " (" + attemptsLeft + " attempts left)");
+
+                            // Check for max attempts
+                            if (session.getVerificationAttempts() >= EnhancedPurgatoryManager.PurgatorySession.MAX_VERIFICATION_ATTEMPTS) {
+                                debugLog("Player " + username + " reached max verification attempts, removing session");
+                                source.sendMessage(Component.text("Too many failed attempts. Please use /mc to start over.", NamedTextColor.RED));
+                                purgatoryManager.removeSession(username);
+                            } else {
+                                source.sendMessage(Component.text("Invalid verification code. Please check the code and try again. (" + attemptsLeft + " attempts remaining)", NamedTextColor.RED));
+                                if (attemptsLeft <= 3) {
+                                    source.sendMessage(Component.text("Warning: After " + attemptsLeft + " more failed attempts, you'll need to start over with /mc in Discord", NamedTextColor.GOLD));
+                                }
                             }
                         }
+                    } else {
+                        if (source != null) {
+                            source.sendMessage(Component.text("This command can only be used by players.", NamedTextColor.RED));
+                        }
+                        return 0;
                     }
 
                     return Command.SINGLE_SUCCESS;
@@ -241,16 +259,24 @@ public class BrigadierCommandHandler {
                         
                         debugLog("Admin " + source + " adding player " + playerName + " to whitelist");
                         
-                        sqlHandler.addPlayerToWhitelist(playerName, null)
-                            .thenRun(() -> {
+                        CompletableFuture.supplyAsync(() -> {
+                            try {
+                                return sqlHandler.addToWhitelist(playerName, null);
+                            } catch (Exception e) {
+                                throw new RuntimeException(e);
+                            }
+                        }).thenAccept(success -> {
+                            if (success) {
                                 source.sendMessage(Component.text("Successfully added " + playerName + " to the whitelist.", NamedTextColor.GREEN));
                                 debugLog("Successfully added " + playerName + " to whitelist");
-                            })
-                            .exceptionally(ex -> {
-                                source.sendMessage(Component.text("Error adding player to whitelist: " + ex.getMessage(), NamedTextColor.RED));
-                                logger.error("Error adding player to whitelist", ex);
-                                return null;
-                            });
+                            } else {
+                                source.sendMessage(Component.text("Player " + playerName + " is already whitelisted.", NamedTextColor.YELLOW));
+                            }
+                        }).exceptionally(ex -> {
+                            source.sendMessage(Component.text("Error adding player to whitelist: " + ex.getMessage(), NamedTextColor.RED));
+                            logger.error("Error adding player to whitelist", ex);
+                            return null;
+                        });
                         
                         return Command.SINGLE_SUCCESS;
                     })))
@@ -262,16 +288,24 @@ public class BrigadierCommandHandler {
                         
                         debugLog("Admin " + source + " removing player " + playerName + " from whitelist");
                         
-                        sqlHandler.removePlayerFromWhitelist(playerName)
-                            .thenRun(() -> {
+                        CompletableFuture.supplyAsync(() -> {
+                            try {
+                                return sqlHandler.removeFromWhitelist(playerName);
+                            } catch (Exception e) {
+                                throw new RuntimeException(e);
+                            }
+                        }).thenAccept(success -> {
+                            if (success) {
                                 source.sendMessage(Component.text("Successfully removed " + playerName + " from the whitelist.", NamedTextColor.GREEN));
                                 debugLog("Successfully removed " + playerName + " from whitelist");
-                            })
-                            .exceptionally(ex -> {
-                                source.sendMessage(Component.text("Error removing player from whitelist: " + ex.getMessage(), NamedTextColor.RED));
-                                logger.error("Error removing player from whitelist", ex);
-                                return null;
-                            });
+                            } else {
+                                source.sendMessage(Component.text("Player " + playerName + " was not on the whitelist.", NamedTextColor.YELLOW));
+                            }
+                        }).exceptionally(ex -> {
+                            source.sendMessage(Component.text("Error removing player from whitelist: " + ex.getMessage(), NamedTextColor.RED));
+                            logger.error("Error removing player from whitelist", ex);
+                            return null;
+                        });
                         
                         return Command.SINGLE_SUCCESS;
                     })))

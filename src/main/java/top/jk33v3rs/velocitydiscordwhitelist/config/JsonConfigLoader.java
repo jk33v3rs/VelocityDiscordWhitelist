@@ -1,16 +1,20 @@
 package top.jk33v3rs.velocitydiscordwhitelist.config;
 
+import java.io.IOException;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.slf4j.Logger;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import org.slf4j.Logger;
-
-import java.io.*;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
-import java.util.HashMap;
-import java.util.Map;
+import com.google.gson.JsonSyntaxException;
 
 /**
  * JsonConfigLoader manages JSON configuration files for the plugin.
@@ -62,7 +66,7 @@ public class JsonConfigLoader {
             loadedConfigs.put(fullFileName, config);
             
             return config;
-        } catch (IOException e) {
+        } catch (IOException | JsonSyntaxException | IllegalStateException e) {
             logger.error("Failed to load config file: " + fullFileName, e);
             
             // Try to parse default config as fallback
@@ -70,8 +74,8 @@ public class JsonConfigLoader {
                 JsonObject fallback = JsonParser.parseString(defaultConfig).getAsJsonObject();
                 loadedConfigs.put(fullFileName, fallback);
                 return fallback;
-            } catch (Exception ex) {
-                logger.error("Failed to parse default config", ex);
+            } catch (IllegalStateException | JsonSyntaxException ex) {
+                logger.error("Failed to parse default config due to JSON syntax or state issues", ex);
                 throw new RuntimeException("Failed to load or create config file: " + fullFileName, e);
             }
         }
@@ -108,283 +112,326 @@ public class JsonConfigLoader {
     }
     
     /**
+     * Gets the default configuration as JSON string
+     * 
+     * @return The default configuration JSON
+     */
+    public static String getDefaultConfig() {
+        return """
+            {
+              "database": {
+                "host": "localhost",
+                "port": 3306,
+                "database": "whitelist",
+                "username": "root",
+                "password": "",
+                "useSSL": false,
+                "connectionTimeout": 30000
+              },
+              "discord": {
+                "token": "",
+                "guildId": "",
+                "approvedChannelIds": "",
+                "init_timeout": 30,
+                "roles": {
+                  "verified": "",
+                  "unverified": "",
+                  "purgatory": ""
+                }
+              },
+              "whitelist": {
+                "enablePurgatory": true,
+                "purgatoryTimeout": 300,
+                "enableRanks": true,
+                "enableRewards": true
+              },
+              "security": {
+                "enableLogging": true,
+                "enableAudit": true,
+                "maxConnectionAttempts": 3
+              }
+            }""";
+    }
+    
+    /**
      * Gets the default ranks configuration
      * 
      * @return The default ranks configuration JSON
      */
     public static String getDefaultRanksConfig() {
-        return "{\n" +
-            "  \"main_ranks\": [\n" +
-            "    {\n" +
-            "      \"id\": 1,\n" +
-            "      \"name\": \"bystander\",\n" +
-            "      \"description\": \"First rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 0,\n" +
-            "      \"required_achievements\": 0\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 2,\n" +
-            "      \"name\": \"onlooker\",\n" +
-            "      \"description\": \"Second rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 60,\n" +
-            "      \"required_achievements\": 1\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 3,\n" +
-            "      \"name\": \"wanderer\",\n" +
-            "      \"description\": \"Third rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 120,\n" +
-            "      \"required_achievements\": 2\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 4,\n" +
-            "      \"name\": \"traveller\",\n" +
-            "      \"description\": \"Fourth rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 240,\n" +
-            "      \"required_achievements\": 3\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 5,\n" +
-            "      \"name\": \"explorer\",\n" +
-            "      \"description\": \"Fifth rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 480,\n" +
-            "      \"required_achievements\": 5\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 6,\n" +
-            "      \"name\": \"adventurer\",\n" +
-            "      \"description\": \"Sixth rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 720,\n" +
-            "      \"required_achievements\": 8\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 7,\n" +
-            "      \"name\": \"surveyor\",\n" +
-            "      \"description\": \"Seventh rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 1080,\n" +
-            "      \"required_achievements\": 12\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 8,\n" +
-            "      \"name\": \"navigator\",\n" +
-            "      \"description\": \"Eighth rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 1440,\n" +
-            "      \"required_achievements\": 16\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 9,\n" +
-            "      \"name\": \"journeyman\",\n" +
-            "      \"description\": \"Ninth rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 2160,\n" +
-            "      \"required_achievements\": 20\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 10,\n" +
-            "      \"name\": \"pathfinder\",\n" +
-            "      \"description\": \"Tenth rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 2880,\n" +
-            "      \"required_achievements\": 25\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 11,\n" +
-            "      \"name\": \"trailblazer\",\n" +
-            "      \"description\": \"Eleventh rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 3600,\n" +
-            "      \"required_achievements\": 30\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 12,\n" +
-            "      \"name\": \"pioneer\",\n" +
-            "      \"description\": \"Twelfth rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 4320,\n" +
-            "      \"required_achievements\": 35\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 13,\n" +
-            "      \"name\": \"craftsman\",\n" +
-            "      \"description\": \"Thirteenth rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 5040,\n" +
-            "      \"required_achievements\": 40\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 14,\n" +
-            "      \"name\": \"specialist\",\n" +
-            "      \"description\": \"Fourteenth rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 5760,\n" +
-            "      \"required_achievements\": 45\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 15,\n" +
-            "      \"name\": \"artisan\",\n" +
-            "      \"description\": \"Fifteenth rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 6480,\n" +
-            "      \"required_achievements\": 50\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 16,\n" +
-            "      \"name\": \"veteran\",\n" +
-            "      \"description\": \"Sixteenth rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 7200,\n" +
-            "      \"required_achievements\": 55\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 17,\n" +
-            "      \"name\": \"sage\",\n" +
-            "      \"description\": \"Seventeenth rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 7920,\n" +
-            "      \"required_achievements\": 60\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 18,\n" +
-            "      \"name\": \"luminary\",\n" +
-            "      \"description\": \"Eighteenth rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 8640,\n" +
-            "      \"required_achievements\": 65\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 19,\n" +
-            "      \"name\": \"titan\",\n" +
-            "      \"description\": \"Nineteenth rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 9360,\n" +
-            "      \"required_achievements\": 70\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 20,\n" +
-            "      \"name\": \"legend\",\n" +
-            "      \"description\": \"Twentieth rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 10080,\n" +
-            "      \"required_achievements\": 75\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 21,\n" +
-            "      \"name\": \"eternal\",\n" +
-            "      \"description\": \"Twenty-first rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 10800,\n" +
-            "      \"required_achievements\": 80\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 22,\n" +
-            "      \"name\": \"ascendant\",\n" +
-            "      \"description\": \"Twenty-second rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 11520,\n" +
-            "      \"required_achievements\": 85\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 23,\n" +
-            "      \"name\": \"celestial\",\n" +
-            "      \"description\": \"Twenty-third rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 12240,\n" +
-            "      \"required_achievements\": 90\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 24,\n" +
-            "      \"name\": \"divine\",\n" +
-            "      \"description\": \"Twenty-fourth rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 12960,\n" +
-            "      \"required_achievements\": 95\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 25,\n" +
-            "      \"name\": \"deity\",\n" +
-            "      \"description\": \"Final rank in the official progression system\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"required_time\": 14400,\n" +
-            "      \"required_achievements\": 100,\n" +
-            "      \"is_special\": true\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 28,\n" +
-            "      \"name\": \"booster\",\n" +
-            "      \"description\": \"Custom supporter rank - Discord Nitro Booster\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"is_special\": true\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 35,\n" +
-            "      \"name\": \"mod\",\n" +
-            "      \"description\": \"Elevated moderator rank\",\n" +
-            "      \"discord_role_id\": 0,\n" +
-            "      \"is_special\": true\n" +
-            "    }\n" +
-            "  ],\n" +
-            "  \"sub_ranks\": [\n" +
-            "    {\n" +
-            "      \"id\": 1,\n" +
-            "      \"name\": \"novice\",\n" +
-            "      \"description\": \"First sub-rank in the official progression system\"\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 2,\n" +
-            "      \"name\": \"apprentice\",\n" +
-            "      \"description\": \"Second sub-rank in the official progression system\"\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 3,\n" +
-            "      \"name\": \"adept\",\n" +
-            "      \"description\": \"Third sub-rank in the official progression system\"\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 4,\n" +
-            "      \"name\": \"master\",\n" +
-            "      \"description\": \"Fourth sub-rank in the official progression system\"\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 5,\n" +
-            "      \"name\": \"heroic\",\n" +
-            "      \"description\": \"Fifth sub-rank in the official progression system\"\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 6,\n" +
-            "      \"name\": \"mythic\",\n" +
-            "      \"description\": \"Sixth sub-rank in the official progression system\"\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": 7,\n" +
-            "      \"name\": \"immortal\",\n" +
-            "      \"description\": \"Final sub-rank in the official progression system\"\n" +
-            "    }\n" +
-            "  ],\n" +
-            "  \"state_roles\": {\n" +
-            "    \"UNVERIFIED\": 0,\n" +
-            "    \"PURGATORY\": 0,\n" +
-            "    \"VERIFIED\": 0\n" +
-            "  },\n" +
-            "  \"progression\": {\n" +
-            "    \"xp_sources\": {\n" +
-            "      \"CHAT_MESSAGE\": 1,\n" +
-            "      \"VOICE_MINUTE\": 2,\n" +
-            "      \"ACHIEVEMENT\": 10,\n" +
-            "      \"DISCORD_REACTION\": 1,\n" +
-            "      \"EVENT_PARTICIPATION\": 25\n" +
-            "    },\n" +
-            "    \"subrank_multiplier\": 1.5,\n" +
-            "    \"mainrank_multiplier\": 2.0\n" +
-            "  }\n" +
-            "}";
+        return """
+            {
+              "main_ranks": [
+                {
+                  "id": 1,
+                  "name": "bystander",
+                  "description": "First rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 0,
+                  "required_achievements": 0
+                },
+                {
+                  "id": 2,
+                  "name": "onlooker",
+                  "description": "Second rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 60,
+                  "required_achievements": 1
+                },
+                {
+                  "id": 3,
+                  "name": "wanderer",
+                  "description": "Third rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 120,
+                  "required_achievements": 2
+                },
+                {
+                  "id": 4,
+                  "name": "traveller",
+                  "description": "Fourth rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 240,
+                  "required_achievements": 3
+                },
+                {
+                  "id": 5,
+                  "name": "explorer",
+                  "description": "Fifth rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 480,
+                  "required_achievements": 5
+                },
+                {
+                  "id": 6,
+                  "name": "adventurer",
+                  "description": "Sixth rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 720,
+                  "required_achievements": 8
+                },
+                {
+                  "id": 7,
+                  "name": "surveyor",
+                  "description": "Seventh rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 1080,
+                  "required_achievements": 12
+                },
+                {
+                  "id": 8,
+                  "name": "navigator",
+                  "description": "Eighth rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 1440,
+                  "required_achievements": 16
+                },
+                {
+                  "id": 9,
+                  "name": "journeyman",
+                  "description": "Ninth rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 2160,
+                  "required_achievements": 20
+                },
+                {
+                  "id": 10,
+                  "name": "pathfinder",
+                  "description": "Tenth rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 2880,
+                  "required_achievements": 25
+                },
+                {
+                  "id": 11,
+                  "name": "trailblazer",
+                  "description": "Eleventh rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 3600,
+                  "required_achievements": 30
+                },
+                {
+                  "id": 12,
+                  "name": "pioneer",
+                  "description": "Twelfth rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 4320,
+                  "required_achievements": 35
+                },
+                {
+                  "id": 13,
+                  "name": "craftsman",
+                  "description": "Thirteenth rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 5040,
+                  "required_achievements": 40
+                },
+                {
+                  "id": 14,
+                  "name": "specialist",
+                  "description": "Fourteenth rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 5760,
+                  "required_achievements": 45
+                },
+                {
+                  "id": 15,
+                  "name": "artisan",
+                  "description": "Fifteenth rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 6480,
+                  "required_achievements": 50
+                },
+                {
+                  "id": 16,
+                  "name": "veteran",
+                  "description": "Sixteenth rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 7200,
+                  "required_achievements": 55
+                },
+                {
+                  "id": 17,
+                  "name": "sage",
+                  "description": "Seventeenth rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 7920,
+                  "required_achievements": 60
+                },
+                {
+                  "id": 18,
+                  "name": "luminary",
+                  "description": "Eighteenth rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 8640,
+                  "required_achievements": 65
+                },
+                {
+                  "id": 19,
+                  "name": "titan",
+                  "description": "Nineteenth rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 9360,
+                  "required_achievements": 70
+                },
+                {
+                  "id": 20,
+                  "name": "legend",
+                  "description": "Twentieth rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 10080,
+                  "required_achievements": 75
+                },
+                {
+                  "id": 21,
+                  "name": "eternal",
+                  "description": "Twenty-first rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 10800,
+                  "required_achievements": 80
+                },
+                {
+                  "id": 22,
+                  "name": "ascendant",
+                  "description": "Twenty-second rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 11520,
+                  "required_achievements": 85
+                },
+                {
+                  "id": 23,
+                  "name": "celestial",
+                  "description": "Twenty-third rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 12240,
+                  "required_achievements": 90
+                },
+                {
+                  "id": 24,
+                  "name": "divine",
+                  "description": "Twenty-fourth rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 12960,
+                  "required_achievements": 95
+                },
+                {
+                  "id": 25,
+                  "name": "deity",
+                  "description": "Final rank in the official progression system",
+                  "discord_role_id": 0,
+                  "required_time": 14400,
+                  "required_achievements": 100,
+                  "is_special": true
+                },
+                {
+                  "id": 28,
+                  "name": "booster",
+                  "description": "Custom supporter rank - Discord Nitro Booster",
+                  "discord_role_id": 0,
+                  "is_special": true
+                },
+                {
+                  "id": 35,
+                  "name": "mod",
+                  "description": "Elevated moderator rank",
+                  "discord_role_id": 0,
+                  "is_special": true
+                }
+              ],
+              "sub_ranks": [
+                {
+                  "id": 1,
+                  "name": "novice",
+                  "description": "First sub-rank in the official progression system"
+                },
+                {
+                  "id": 2,
+                  "name": "apprentice",
+                  "description": "Second sub-rank in the official progression system"
+                },
+                {
+                  "id": 3,
+                  "name": "adept",
+                  "description": "Third sub-rank in the official progression system"
+                },
+                {
+                  "id": 4,
+                  "name": "master",
+                  "description": "Fourth sub-rank in the official progression system"
+                },
+                {
+                  "id": 5,
+                  "name": "heroic",
+                  "description": "Fifth sub-rank in the official progression system"
+                },
+                {
+                  "id": 6,
+                  "name": "mythic",
+                  "description": "Sixth sub-rank in the official progression system"
+                },
+                {
+                  "id": 7,
+                  "name": "immortal",
+                  "description": "Final sub-rank in the official progression system"
+                }
+              ],
+              "state_roles": {
+                "UNVERIFIED": 0,
+                "PURGATORY": 0,
+                "VERIFIED": 0
+              },
+              "progression": {
+                "xp_sources": {
+                  "CHAT_MESSAGE": 1,
+                  "VOICE_MINUTE": 2,
+                  "ACHIEVEMENT": 10,
+                  "DISCORD_REACTION": 1,
+                  "EVENT_PARTICIPATION": 25
+                },
+                "subrank_multiplier": 1.5,
+                "mainrank_multiplier": 2.0
+              }
+            }""";
     }
     
     /**
@@ -393,78 +440,79 @@ public class JsonConfigLoader {
      * @return The default rewards configuration JSON
      */
     public static String getDefaultRewardsConfig() {
-        return "{\n" +
-            "  \"reward_types\": [\n" +
-            "    {\n" +
-            "      \"id\": \"item\",\n" +
-            "      \"name\": \"Item Reward\",\n" +
-            "      \"description\": \"Gives the player a specific item\"\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": \"money\",\n" +
-            "      \"name\": \"Money Reward\",\n" +
-            "      \"description\": \"Gives the player in-game currency\"\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": \"permission\",\n" +
-            "      \"name\": \"Permission Reward\",\n" +
-            "      \"description\": \"Grants the player a specific permission\"\n" +
-            "    },\n" +
-            "    {\n" +
-            "      \"id\": \"command\",\n" +
-            "      \"name\": \"Command Reward\",\n" +
-            "      \"description\": \"Executes a command on behalf of the player\"\n" +
-            "    }\n" +
-            "  ],\n" +
-            "  \"rank_rewards\": {\n" +
-            "    \"Wanderer\": [\n" +
-            "      {\n" +
-            "        \"type\": \"permission\",\n" +
-            "        \"value\": \"essentials.home.2\",\n" +
-            "        \"description\": \"Allows setting 2 homes\"\n" +
-            "      }\n" +
-            "    ],\n" +
-            "    \"Traveller\": [\n" +
-            "      {\n" +
-            "        \"type\": \"permission\",\n" +
-            "        \"value\": \"essentials.home.3\",\n" +
-            "        \"description\": \"Allows setting 3 homes\"\n" +
-            "      },\n" +
-            "      {\n" +
-            "        \"type\": \"money\",\n" +
-            "        \"value\": \"100\",\n" +
-            "        \"description\": \"100 coins reward\"\n" +
-            "      }\n" +
-            "    ],\n" +
-            "    \"Explorer\": [\n" +
-            "      {\n" +
-            "        \"type\": \"permission\",\n" +
-            "        \"value\": \"essentials.home.5\",\n" +
-            "        \"description\": \"Allows setting 5 homes\"\n" +
-            "      },\n" +
-            "      {\n" +
-            "        \"type\": \"money\",\n" +
-            "        \"value\": \"250\",\n" +
-            "        \"description\": \"250 coins reward\"\n" +
-            "      }\n" +
-            "    ]\n" +
-            "  },\n" +
-            "  \"subrank_rewards\": {\n" +
-            "    \"Adept\": [\n" +
-            "      {\n" +
-            "        \"type\": \"money\",\n" +
-            "        \"value\": \"50\",\n" +
-            "        \"description\": \"50 coins reward\"\n" +
-            "      }\n" +
-            "    ],\n" +
-            "    \"Master\": [\n" +
-            "      {\n" +
-            "        \"type\": \"item\",\n" +
-            "        \"value\": \"diamond 5\",\n" +
-            "        \"description\": \"5 diamonds reward\"\n" +
-            "      }\n" +
-            "    ]\n" +
-            "  }\n" +
-            "}";
+        return """
+            {
+              "reward_types": [
+                {
+                  "id": "item",
+                  "name": "Item Reward",
+                  "description": "Gives the player a specific item"
+                },
+                {
+                  "id": "money",
+                  "name": "Money Reward",
+                  "description": "Gives the player in-game currency"
+                },
+                {
+                  "id": "permission",
+                  "name": "Permission Reward",
+                  "description": "Grants the player a specific permission"
+                },
+                {
+                  "id": "command",
+                  "name": "Command Reward",
+                  "description": "Executes a command on behalf of the player"
+                }
+              ],
+              "rank_rewards": {
+                "Wanderer": [
+                  {
+                    "type": "permission",
+                    "value": "essentials.home.2",
+                    "description": "Allows setting 2 homes"
+                  }
+                ],
+                "Traveller": [
+                  {
+                    "type": "permission",
+                    "value": "essentials.home.3",
+                    "description": "Allows setting 3 homes"
+                  },
+                  {
+                    "type": "money",
+                    "value": "100",
+                    "description": "100 coins reward"
+                  }
+                ],
+                "Explorer": [
+                  {
+                    "type": "permission",
+                    "value": "essentials.home.5",
+                    "description": "Allows setting 5 homes"
+                  },
+                  {
+                    "type": "money",
+                    "value": "250",
+                    "description": "250 coins reward"
+                  }
+                ]
+              },
+              "subrank_rewards": {
+                "Adept": [
+                  {
+                    "type": "money",
+                    "value": "50",
+                    "description": "50 coins reward"
+                  }
+                ],
+                "Master": [
+                  {
+                    "type": "item",
+                    "value": "diamond 5",
+                    "description": "5 diamonds reward"
+                  }
+                ]
+              }
+            }""";
     }
 }

@@ -1,17 +1,19 @@
 package top.jk33v3rs.velocitydiscordwhitelist.commands;
 
+import org.slf4j.Logger;
+
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.velocitypowered.api.command.BrigadierCommand;
 import com.velocitypowered.api.command.CommandSource;
 import com.velocitypowered.api.proxy.Player;
+
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import org.slf4j.Logger;
+import top.jk33v3rs.velocitydiscordwhitelist.models.XPEvent;
 import top.jk33v3rs.velocitydiscordwhitelist.modules.RewardsHandler;
 import top.jk33v3rs.velocitydiscordwhitelist.modules.XPManager;
-import top.jk33v3rs.velocitydiscordwhitelist.models.XPEvent;
 
 /**
  * RankCommand allows players to check rank progress and statistics.
@@ -286,20 +288,14 @@ public class RankCommand {
      * @return A formatted display string
      */
     private String formatEventSource(String eventType, String eventSource) {
-        switch (eventType) {
-            case "ADVANCEMENT":
-                return "advancement: " + eventSource.replace("minecraft:", "").replace("_", " ");
-            case "BLAZE_AND_CAVE":
-                return "BlazeAndCave: " + eventSource.replace("blazeandcave:", "").replace("_", " ");
-            case "PLAYTIME":
-                return "playtime";
-            case "KILL":
-                return "killing " + eventSource.replace("_", " ");
-            case "BREAK_BLOCK":
-                return "breaking " + eventSource.replace("_", " ");
-            default:
-                return eventSource;
-        }
+        return switch (eventType) {
+            case "ADVANCEMENT" -> "advancement: " + eventSource.replace("minecraft:", "").replace("_", " ");
+            case "BLAZE_AND_CAVE" -> "BlazeAndCave: " + eventSource.replace("blazeandcave:", "").replace("_", " ");
+            case "PLAYTIME" -> "playtime";
+            case "KILL" -> "killing " + eventSource.replace("_", " ");
+            case "BREAK_BLOCK" -> "breaking " + eventSource.replace("_", " ");
+            default -> eventSource;
+        };
     }
     
     /**
@@ -320,5 +316,30 @@ public class RankCommand {
         } else {
             return (seconds / 86400) + "d ago";
         }
+    }
+    
+    /**
+     * formatXPEventType
+     * Formats an XP event type for display in user messages.
+     * Converts internal event type names to user-friendly display names.
+     *
+     * @param eventType The internal event type string
+     * @return A formatted, user-friendly event type name
+     */
+    private String formatXPEventType(String eventType) {
+        return switch (eventType) {
+            case "ADVANCEMENT" -> "Advancement";
+            case "BLAZE_AND_CAVE" -> "BlazeAndCave Achievement";
+            case "PLAYTIME" -> "Play Time";
+            case "KILL" -> "Monster Kill";
+            case "BREAK_BLOCK" -> "Block Break";
+            case "PLACE_BLOCK" -> "Block Place";
+            case "CRAFT_ITEM" -> "Item Craft";
+            case "ENCHANT_ITEM" -> "Item Enchant";
+            case "TRADE" -> "Villager Trade";
+            case "FISHING" -> "Fishing";
+            case "MINING" -> "Mining";
+            default -> eventType; // Return as-is if unknown
+        };
     }
 }

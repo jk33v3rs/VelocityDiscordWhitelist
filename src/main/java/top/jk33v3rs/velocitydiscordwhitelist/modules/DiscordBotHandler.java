@@ -1,11 +1,25 @@
 package top.jk33v3rs.velocitydiscordwhitelist.modules;
 
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeoutException;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+import org.slf4j.Logger;
+
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
+import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
@@ -16,13 +30,7 @@ import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
-import org.slf4j.Logger;
 import top.jk33v3rs.velocitydiscordwhitelist.database.SQLHandler;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeoutException;
 
 /**
  * DiscordBotHandler manages integration with the Discord bot for validation and messaging.
@@ -39,15 +47,15 @@ public class DiscordBotHandler extends ListenerAdapter {
     private final int MAX_CONNECTION_ATTEMPTS = 3;
     
     // Database handler for whitelist operations
-    private SQLHandler sqlHandler;
+    private final SQLHandler sqlHandler;
     
     // JDA instance for Discord API interactions
     private JDA jda;
     // Guild ID and channel IDs configuration
     private String guildId;
-    private Set<String> approvedChannels = new HashSet<>();
+    private final Set<String> approvedChannels = new HashSet<>();
     // Role ID mapping
-    private Map<String, String> roleIdMap = new HashMap<>();
+    private final Map<String, String> roleIdMap = new HashMap<>();
 
     /**
      * Constructor for DiscordBotHandler.
@@ -214,6 +222,9 @@ public class DiscordBotHandler extends ListenerAdapter {
                 return null;
             });
 
+        } catch (IllegalArgumentException | SecurityException e) {
+            logger.error("[Discord] Configuration error during bot initialization", e);
+            initializationFuture.complete(false);
         } catch (Exception e) {
             logger.error("[Discord] Error initializing Discord bot", e);
             initializationFuture.complete(false);
@@ -262,6 +273,8 @@ public class DiscordBotHandler extends ListenerAdapter {
                 .queue();
                 
             logger.info("[Discord] Slash commands registered");
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            logger.error("[Discord] Invalid configuration for slash commands", e);
         } catch (Exception e) {
             logger.error("[Discord] Error registering slash commands", e);
         }
@@ -280,21 +293,18 @@ public class DiscordBotHandler extends ListenerAdapter {
         
         try {
             switch (command) {
-                case "mc":
-                    handleMcCommand(event); // Discord-initiated verification
-                    break;
-                case "verify":
-                    handleLegacyVerifyCommand(event); // Legacy support - deprecated
-                    break;
-                case "whitelist":
-                    handleWhitelistCommand(event);
-                    break;
-                case "rank":
-                    handleRankCommand(event);
-                    break;
-                default:
-                    event.reply("Unknown command.").setEphemeral(true).queue();
+                case "mc" -> handleMcCommand(event); // Discord-initiated verification
+                case "verify" -> handleLegacyVerifyCommand(event); // Legacy support - deprecated
+                case "whitelist" -> handleWhitelistCommand(event);
+                case "rank" -> handleRankCommand(event);
+                default -> event.reply("Unknown command.").setEphemeral(true).queue();
             }
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            logger.error("[Discord] Invalid command parameters for {}: {}", command, e.getMessage(), e);
+            event.reply("Invalid command parameters. Please check your input and try again.").setEphemeral(true).queue();
+        } catch (net.dv8tion.jda.api.exceptions.ErrorResponseException e) {
+            logger.error("[Discord] Discord API error handling slash command {}: {}", command, e.getMeaning(), e);
+            event.reply("Discord API error occurred. Please try again later.").setEphemeral(true).queue();
         } catch (Exception e) {
             logger.error("[Discord] Error handling slash command: {}", command, e);
             event.reply("An error occurred while processing your command. Please try again later.").setEphemeral(true).queue();
@@ -351,19 +361,25 @@ public class DiscordBotHandler extends ListenerAdapter {
             
         if (result.isSuccess()) {
             String code = result.getValidationCode();
-            event.getHook().sendMessage(
-                "✅ **Verification code generated for " + username + "**\n\n" +
-                "🎮 **Your verification code:** `" + code + "`\n\n" +
-                "📝 **Join the game server and use `/verify " + code + "` to be whitelisted - you have 5 minutes**\n\n" +
-                "🔒 This message is only visible to you.")
+            event.getHook().sendMessage("""
+                ✅ **Verification code generated for %s**
+
+                🎮 **Your verification code:** `%s`
+
+                📝 **Join the game server and use `/verify %s` to be whitelisted - you have 5 minutes**
+
+                🔒 This message is only visible to you.""".formatted(username, code, code))
                 .setEphemeral(true).queue();
                 
             debugLog("Generated verification code " + code + " for Discord user " + user.getName() + " -> Minecraft username " + username);
         } else {
             String errorMsg = result.getErrorMessage() != null ? result.getErrorMessage() : "Unknown error";
-            event.getHook().sendMessage("❌ **Error generating verification code**\n\n" + 
-                "**Reason:** " + errorMsg + "\n\n" +
-                "Please try again or contact an administrator if the problem persists.")
+            event.getHook().sendMessage("""
+                ❌ **Error generating verification code**
+
+                **Reason:** %s
+
+                Please try again or contact an administrator if the problem persists.""".formatted(errorMsg))
                 .setEphemeral(true).queue();
                 
             debugLog("Failed to generate verification code for Discord user " + user.getName() + " -> Minecraft username " + username + ": " + errorMsg);
@@ -379,12 +395,15 @@ public class DiscordBotHandler extends ListenerAdapter {
      * @param event The slash command event
      */
     private void handleLegacyVerifyCommand(@Nonnull SlashCommandInteractionEvent event) {
-        event.reply("⚠️ **This command is deprecated**\n\n" +
-            "**Please use the new verification process:**\n" +
-            "1. Use `/mc <your_minecraft_username>` here in Discord\n" +
-            "2. Join the Minecraft server\n" +
-            "3. Use `/verify` in-game\n\n" +
-            "The new process is more secure and user-friendly!")
+        event.reply("""
+            ⚠️ **This command is deprecated**
+
+            **Please use the new verification process:**
+            1. Use `/mc <your_minecraft_username>` here in Discord
+            2. Join the Minecraft server
+            3. Use `/verify` in-game
+
+            The new process is more secure and user-friendly!""")
             .setEphemeral(true).queue();
     }
     
@@ -425,17 +444,10 @@ public class DiscordBotHandler extends ListenerAdapter {
         event.deferReply(true).queue();
         
         switch (action) {
-            case "add":
-                addPlayerToWhitelist(event, username);
-                break;
-            case "remove":
-                removePlayerFromWhitelist(event, username);
-                break;
-            case "check":
-                checkPlayerWhitelist(event, username);
-                break;
-            default:
-                event.getHook().sendMessage("Unknown action: " + action + ". Available actions: add, remove, check")
+            case "add" -> addPlayerToWhitelist(event, username);
+            case "remove" -> removePlayerFromWhitelist(event, username);
+            case "check" -> checkPlayerWhitelist(event, username);
+            default -> event.getHook().sendMessage("Unknown action: " + action + ". Available actions: add, remove, check")
                     .setEphemeral(true).queue();
         }
     }
@@ -489,18 +501,31 @@ public class DiscordBotHandler extends ListenerAdapter {
      */
     private void addPlayerToWhitelist(@Nonnull SlashCommandInteractionEvent event, String username) {
         try {
-            sqlHandler.addPlayerToWhitelist(username, null)
-                .thenRun(() -> {
+            CompletableFuture.supplyAsync(() -> {
+                try {
+                    return sqlHandler.addToWhitelist(username, null);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }).thenAccept(success -> {
+                if (success) {
                     event.getHook().sendMessage("✅ Successfully added **" + username + "** to the whitelist.")
                         .setEphemeral(true).queue();
                     logger.info("[Discord] User {} added {} to the whitelist", event.getUser().getName(), username);
-                })
-                .exceptionally(e -> {
-                    event.getHook().sendMessage("❗ Error adding player to whitelist: " + e.getMessage())
+                } else {
+                    event.getHook().sendMessage("⚠️ Player **" + username + "** is already on the whitelist.")
                         .setEphemeral(true).queue();
-                    logger.error("[Discord] Error adding player to whitelist", e);
-                    return null;
-                });
+                }
+            }).exceptionally(e -> {
+                event.getHook().sendMessage("❗ Error adding player to whitelist: " + e.getMessage())
+                    .setEphemeral(true).queue();
+                logger.error("[Discord] Error adding player to whitelist", e);
+                return null;
+            });
+        } catch (IllegalArgumentException e) {
+            event.getHook().sendMessage("❌ Invalid username provided: " + e.getMessage())
+                .setEphemeral(true).queue();
+            logger.error("[Discord] Invalid argument for whitelist add", e);
         } catch (Exception e) {
             event.getHook().sendMessage("❌ Internal error while processing whitelist command: " + e.getMessage())
                 .setEphemeral(true).queue();
@@ -519,18 +544,31 @@ public class DiscordBotHandler extends ListenerAdapter {
      */
     private void removePlayerFromWhitelist(@Nonnull SlashCommandInteractionEvent event, String username) {
         try {
-            sqlHandler.removePlayerFromWhitelist(username)
-                .thenRun(() -> {
+            CompletableFuture.supplyAsync(() -> {
+                try {
+                    return sqlHandler.removeFromWhitelist(username);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }).thenAccept(success -> {
+                if (success) {
                     event.getHook().sendMessage("✅ Successfully removed **" + username + "** from the whitelist.")
                         .setEphemeral(true).queue();
                     logger.info("[Discord] User {} removed {} from the whitelist", event.getUser().getName(), username);
-                })
-                .exceptionally(ex -> {
-                    event.getHook().sendMessage("❌ Error removing player from whitelist: " + ex.getMessage())
+                } else {
+                    event.getHook().sendMessage("⚠️ Player **" + username + "** was not on the whitelist.")
                         .setEphemeral(true).queue();
-                    logger.error("[Discord] Error removing player from whitelist", ex);
-                    return null;
-                });
+                }
+            }).exceptionally(ex -> {
+                event.getHook().sendMessage("❌ Error removing player from whitelist: " + ex.getMessage())
+                    .setEphemeral(true).queue();
+                logger.error("[Discord] Error removing player from whitelist", ex);
+                return null;
+            });
+        } catch (IllegalArgumentException e) {
+            event.getHook().sendMessage("❌ Invalid username provided: " + e.getMessage())
+                .setEphemeral(true).queue();
+            logger.error("[Discord] Invalid argument for whitelist remove", e);
         } catch (Exception e) {
             event.getHook().sendMessage("❌ Internal error while processing whitelist command: " + e.getMessage())
                 .setEphemeral(true).queue();
@@ -549,30 +587,32 @@ public class DiscordBotHandler extends ListenerAdapter {
      */
     private void checkPlayerWhitelist(@Nonnull SlashCommandInteractionEvent event, String username) {
         try {
-            // Get the player's UUID from the database
-            Optional<String> optionalUuid = sqlHandler.getPlayerUuidByUsername(username);
-            
-            if (optionalUuid.isPresent()) {
-                String uuid = optionalUuid.get();
-                
-                // Get player verification state
-                Optional<String> verificationState = sqlHandler.getPlayerVerificationState(uuid);
-                String state = verificationState.orElse("UNVERIFIED");
-                
-                // Get Discord link status
-                Optional<Long> discordId = sqlHandler.getPlayerDiscordId(uuid);
-                String discordStatus = discordId.isPresent() ? "Linked to Discord account" : "Not linked to Discord";
-                
-                // Build a detailed response
-                event.getHook().sendMessage("✅ Player **" + username + "** is on the whitelist.\n" +
-                    "UUID: `" + uuid + "`\n" +
-                    "Verification state: `" + state + "`\n" +
-                    "Discord status: `" + discordStatus + "`")
+            CompletableFuture.supplyAsync(() -> {
+                try {
+                    // Use a dummy UUID for the check since we only care about username
+                    java.util.UUID dummyUuid = java.util.UUID.randomUUID();
+                    return sqlHandler.isWhitelisted(username, dummyUuid);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }).thenAccept(isWhitelisted -> {
+                if (isWhitelisted) {
+                    event.getHook().sendMessage("✅ Player **" + username + "** is on the whitelist.")
+                        .setEphemeral(true).queue();
+                } else {
+                    event.getHook().sendMessage("❌ Player **" + username + "** is not on the whitelist.")
+                        .setEphemeral(true).queue();
+                }
+            }).exceptionally(ex -> {
+                event.getHook().sendMessage("❌ Error checking whitelist status: " + ex.getMessage())
                     .setEphemeral(true).queue();
-            } else {
-                event.getHook().sendMessage("❌ Player **" + username + "** is not on the whitelist.")
-                    .setEphemeral(true).queue();
-            }
+                logger.error("[Discord] Error checking whitelist status", ex);
+                return null;
+            });
+        } catch (IllegalArgumentException e) {
+            event.getHook().sendMessage("❌ Invalid username provided: " + e.getMessage())
+                .setEphemeral(true).queue();
+            logger.error("[Discord] Invalid argument for whitelist check", e);
         } catch (Exception e) {
             event.getHook().sendMessage("❌ Internal error while processing whitelist command: " + e.getMessage())
                 .setEphemeral(true).queue();
@@ -604,11 +644,9 @@ public class DiscordBotHandler extends ListenerAdapter {
         event.deferReply(true).queue();
         
         switch (action) {
-            case "list":
-                event.getHook().sendMessage("Listing available ranks is not yet implemented.")
+            case "list" -> event.getHook().sendMessage("Listing available ranks is not yet implemented.")
                     .setEphemeral(true).queue();
-                break;
-            case "check":
+            case "check" -> {
                 OptionMapping checkUsernameOption = event.getOption("username");
                 if (checkUsernameOption == null) {
                     event.getHook().sendMessage("Username is required for rank check.")
@@ -619,8 +657,8 @@ public class DiscordBotHandler extends ListenerAdapter {
                 String checkUsername = checkUsernameOption.getAsString();
                 event.getHook().sendMessage("Checking rank for " + checkUsername + " is not yet implemented.")
                     .setEphemeral(true).queue();
-                break;
-            case "set":
+            }
+            case "set" -> {
                 OptionMapping setUsernameOption = event.getOption("username");
                 OptionMapping mainRankOption = event.getOption("main_rank");
                 OptionMapping subRankOption = event.getOption("sub_rank");
@@ -638,9 +676,8 @@ public class DiscordBotHandler extends ListenerAdapter {
                 event.getHook().sendMessage("Setting rank for " + setUsername + " to " + 
                     mainRank + "." + subRank + " is not yet implemented.")
                     .setEphemeral(true).queue();
-                break;
-            default:
-                event.getHook().sendMessage("Unknown rank action: " + action)
+            }
+            default -> event.getHook().sendMessage("Unknown rank action: " + action)
                     .setEphemeral(true).queue();
         }
     }
@@ -669,6 +706,9 @@ public class DiscordBotHandler extends ListenerAdapter {
             
             // Check if user has admin permission in the guild
             return member.hasPermission(net.dv8tion.jda.api.Permission.ADMINISTRATOR);
+        } catch (net.dv8tion.jda.api.exceptions.ErrorResponseException | IllegalStateException e) {
+            logger.error("[Discord] Discord API error checking admin permissions: {}", e.getMessage(), e);
+            return false;
         } catch (Exception e) {
             logger.error("[Discord] Error checking admin permissions", e);
             return false;
@@ -703,12 +743,8 @@ public class DiscordBotHandler extends ListenerAdapter {
             String args = parts.length > 1 ? parts[1] : "";
             
             switch (command) {
-                case "verify":
-                    handleLegacyVerifyCommand(event, args);
-                    break;
-                case "help":
-                    handleLegacyHelpCommand(event);
-                    break;
+                case "verify" -> handleLegacyVerifyCommand(event, args);
+                case "help" -> handleLegacyHelpCommand(event);
                 // Add more command handlers as needed
             }
         }
@@ -741,9 +777,10 @@ public class DiscordBotHandler extends ListenerAdapter {
         if (result.isSuccess()) {
             // Send DM to user with verification code
             user.openPrivateChannel().queue(channel -> {
-                channel.sendMessage("Please use the following command in Minecraft to complete verification:\n" +
-                    "`/verify " + result.getValidationCode() + "`\n" +
-                    "This code will expire in a few minutes.").queue();
+                channel.sendMessage("""
+                    Please use the following command in Minecraft to complete verification:
+                    `/verify %s`
+                    This code will expire in a few minutes.""".formatted(result.getValidationCode())).queue();
                 
                 // Also reply in channel that a DM was sent
                 event.getChannel().sendMessage("I've sent you a DM with verification instructions!").queue();
@@ -763,15 +800,16 @@ public class DiscordBotHandler extends ListenerAdapter {
      * @param event The message event
      */
     private void handleLegacyHelpCommand(@Nonnull MessageReceivedEvent event) {
-        StringBuilder help = new StringBuilder();
-        help.append("**Whitelist Bot Commands:**\n");
-        help.append("`!verify <username>` - Begin account verification process\n");
-        help.append("`!help` - Show this help message\n\n");
-        help.append("**Slash Commands:**\n");
-        help.append("`/verify username:<username>` - Begin account verification process\n");
-        help.append("`/rank action:[set|check|list] ...` - Manage player ranks (admin only)\n");
+        String help = """
+            **Whitelist Bot Commands:**
+            `!verify <username>` - Begin account verification process
+            `!help` - Show this help message
+
+            **Slash Commands:**
+            `/verify username:<username>` - Begin account verification process
+            `/rank action:[set|check|list] ...` - Manage player ranks (admin only)""";
         
-        event.getChannel().sendMessage(help.toString()).queue();
+        event.getChannel().sendMessage(help).queue();
     }
     
     /**
@@ -812,20 +850,31 @@ public class DiscordBotHandler extends ListenerAdapter {
             return future;
         }
         
-        TextChannel channel = jda.getTextChannelById(channelId);
-        if (channel == null) {
-            logger.warn("[Discord] Channel not found: {}", channelId);
-            future.complete(false);
-            return future;
-        }
-        
-        channel.sendMessage(message).queue(
-            success -> future.complete(true),
-            error -> {
-                logger.error("[Discord] Error sending message to channel {}", channelId, error);
+        try {
+            TextChannel channel = jda.getTextChannelById(channelId);
+            if (channel == null) {
+                logger.warn("[Discord] Channel not found: {}", channelId);
                 future.complete(false);
+                return future;
             }
-        );
+            
+            channel.sendMessage(message).queue(
+                success -> future.complete(true),
+                error -> {
+                    logger.error("[Discord] Error sending message to channel {}", channelId, error);
+                    future.complete(false);
+                }
+            );
+        } catch (NumberFormatException e) {
+            logger.error("[Discord] Invalid channel ID format: {}", channelId, e);
+            future.complete(false);
+        } catch (IllegalArgumentException e) {
+            logger.error("[Discord] Invalid channel ID: {}", channelId, e);
+            future.complete(false);
+        } catch (Exception e) {
+            logger.error("[Discord] Unexpected error sending message to channel {}", channelId, e);
+            future.complete(false);
+        }
         
         return future;
     }

@@ -1,18 +1,20 @@
 package top.jk33v3rs.velocitydiscordwhitelist.modules;
 
-import org.slf4j.Logger;
-import top.jk33v3rs.velocitydiscordwhitelist.database.SQLHandler;
-import top.jk33v3rs.velocitydiscordwhitelist.models.XPEvent;
-import top.jk33v3rs.velocitydiscordwhitelist.models.BlazeAndCavesAdvancement;
-import top.jk33v3rs.velocitydiscordwhitelist.utils.LoggingUtils;
-
+import java.sql.SQLException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CompletableFuture;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.slf4j.Logger;
+
+import top.jk33v3rs.velocitydiscordwhitelist.database.SQLHandler;
+import top.jk33v3rs.velocitydiscordwhitelist.models.BlazeAndCavesAdvancement;
+import top.jk33v3rs.velocitydiscordwhitelist.models.XPEvent;
+import top.jk33v3rs.velocitydiscordwhitelist.utils.LoggingUtils;
 
 /**
  * XPManager handles XP operations with rate limiting to prevent XP farming.
@@ -22,12 +24,14 @@ public class XPManager {
     private final SQLHandler sqlHandler;
     private final Logger logger;
     private final boolean debugEnabled;
-    private final Map<String, Object> config;
     
     // Rate limiting maps
     private final Map<String, Instant> lastEventTime;
     private final Map<String, Integer> eventCounts;
     private final Map<String, BlazeAndCavesAdvancement> blazeAndCavesMap;
+    
+    // XP configuration section - now properly final
+    private final Map<String, Object> xpSection;
     
     // Configuration cache
     private final int maxEventsPerMinute;
@@ -70,29 +74,29 @@ public class XPManager {
         this.sqlHandler = sqlHandler;
         this.logger = logger;
         this.debugEnabled = debugEnabled;
-        this.config = config;
         
-        // Initialize rate limiting maps
+        // Initialize collections
         this.lastEventTime = new ConcurrentHashMap<>();
         this.eventCounts = new ConcurrentHashMap<>();
         this.blazeAndCavesMap = new ConcurrentHashMap<>();
         
-        // Load rate limiting configuration
-        Map<String, Object> xpConfig = (Map<String, Object>) config.getOrDefault("xp", new ConcurrentHashMap<>());
-        Map<String, Object> rateLimitConfig = (Map<String, Object>) xpConfig.getOrDefault("rateLimiting", new ConcurrentHashMap<>());
+        // Load XP configuration section - initialize final field immediately
+        this.xpSection = (Map<String, Object>) config.getOrDefault("xp", new ConcurrentHashMap<>());
         
+        // Load rate limiting configuration
+        Map<String, Object> rateLimitConfig = (Map<String, Object>) config.getOrDefault("xp.rate_limiting", new ConcurrentHashMap<>());
         this.rateLimitingEnabled = Boolean.parseBoolean(rateLimitConfig.getOrDefault("enabled", "true").toString());
+        this.cooldownSeconds = Integer.parseInt(rateLimitConfig.getOrDefault("cooldownSeconds", "5").toString());
         this.maxEventsPerMinute = Integer.parseInt(rateLimitConfig.getOrDefault("maxEventsPerMinute", "10").toString());
         this.maxEventsPerHour = Integer.parseInt(rateLimitConfig.getOrDefault("maxEventsPerHour", "100").toString());
         this.maxEventsPerDay = Integer.parseInt(rateLimitConfig.getOrDefault("maxEventsPerDay", "500").toString());
-        this.cooldownSeconds = Integer.parseInt(rateLimitConfig.getOrDefault("cooldownSeconds", "5").toString());
         
-        // Load XP modifier configuration
-        Map<String, Object> modifierConfig = (Map<String, Object>) xpConfig.getOrDefault("modifiers", new ConcurrentHashMap<>());
+        // Load XP modifiers
+        Map<String, Object> modifierConfig = (Map<String, Object>) config.getOrDefault("xp.modifiers", new ConcurrentHashMap<>());
         this.advancementModifier = Double.parseDouble(modifierConfig.getOrDefault("advancement", "1.0").toString());
-        this.playtimeModifier = Double.parseDouble(modifierConfig.getOrDefault("playtime", "0.5").toString());
-        this.killModifier = Double.parseDouble(modifierConfig.getOrDefault("kill", "0.8").toString());
-        this.breakBlockModifier = Double.parseDouble(modifierConfig.getOrDefault("break_block", "0.3").toString());
+        this.playtimeModifier = Double.parseDouble(modifierConfig.getOrDefault("playtime", "0.1").toString());
+        this.killModifier = Double.parseDouble(modifierConfig.getOrDefault("kill", "0.5").toString());
+        this.breakBlockModifier = Double.parseDouble(modifierConfig.getOrDefault("break_block", "0.1").toString());
         this.placeBlockModifier = Double.parseDouble(modifierConfig.getOrDefault("place_block", "0.2").toString());
         this.craftItemModifier = Double.parseDouble(modifierConfig.getOrDefault("craft_item", "0.4").toString());
         this.enchantItemModifier = Double.parseDouble(modifierConfig.getOrDefault("enchant_item", "1.2").toString());
@@ -101,27 +105,19 @@ public class XPManager {
         this.miningModifier = Double.parseDouble(modifierConfig.getOrDefault("mining", "0.3").toString());
         
         // Load BlazeAndCaves configuration
-        Map<String, Object> blazeConfig = (Map<String, Object>) xpConfig.getOrDefault("blazeAndCaves", new ConcurrentHashMap<>());
-        this.blazeAndCavesEnabled = Boolean.parseBoolean(blazeConfig.getOrDefault("enabled", "true").toString());
+        Map<String, Object> blazeAndCavesConfig = (Map<String, Object>) config.getOrDefault("xp.blaze_and_caves", new ConcurrentHashMap<>());
+        this.blazeAndCavesEnabled = Boolean.parseBoolean(blazeAndCavesConfig.getOrDefault("enabled", "true").toString());
+        this.easyDifficultyMultiplier = Double.parseDouble(blazeAndCavesConfig.getOrDefault("easy_multiplier", "1.0").toString());
+        this.mediumDifficultyMultiplier = Double.parseDouble(blazeAndCavesConfig.getOrDefault("medium_multiplier", "1.25").toString());
+        this.hardDifficultyMultiplier = Double.parseDouble(blazeAndCavesConfig.getOrDefault("hard_multiplier", "1.5").toString());
+        this.insaneDifficultyMultiplier = Double.parseDouble(blazeAndCavesConfig.getOrDefault("insane_multiplier", "2.0").toString());
+        this.terralithBonus = Double.parseDouble(blazeAndCavesConfig.getOrDefault("terralith_bonus", "0.1").toString());
+        this.hardcoreBonus = Double.parseDouble(blazeAndCavesConfig.getOrDefault("hardcore_bonus", "0.5").toString());
         
-        // Load difficulty multipliers
-        Map<String, Object> difficultyConfig = (Map<String, Object>) blazeConfig.getOrDefault("difficultyMultipliers", new ConcurrentHashMap<>());
-        this.easyDifficultyMultiplier = Double.parseDouble(difficultyConfig.getOrDefault("easy", "1.0").toString());
-        this.mediumDifficultyMultiplier = Double.parseDouble(difficultyConfig.getOrDefault("medium", "1.25").toString());
-        this.hardDifficultyMultiplier = Double.parseDouble(difficultyConfig.getOrDefault("hard", "1.5").toString());
-        this.insaneDifficultyMultiplier = Double.parseDouble(difficultyConfig.getOrDefault("insane", "2.0").toString());
+        // Initialize BlazeAndCaves mappings
+        initializeBlazeAndCavesMappings();
         
-        // Load variant bonuses
-        Map<String, Object> variantConfig = (Map<String, Object>) blazeConfig.getOrDefault("variantBonuses", new ConcurrentHashMap<>());
-        this.terralithBonus = Double.parseDouble(variantConfig.getOrDefault("terralith", "0.1").toString());
-        this.hardcoreBonus = Double.parseDouble(variantConfig.getOrDefault("hardcore", "0.5").toString());
-        
-        // Initialize BlazeAndCaves advancement mappings
-        if (blazeAndCavesEnabled) {
-            initializeBlazeAndCavesMappings();
-        }
-        
-        LoggingUtils.debugLog(logger, debugEnabled, "XPManager initialized with rate limiting " + (rateLimitingEnabled ? "enabled" : "disabled"));
+        debugLog("XPManager initialized with rate limiting: " + rateLimitingEnabled);
     }
     
     /**
@@ -161,8 +157,11 @@ public class XPManager {
                 LoggingUtils.debugLog(logger, debugEnabled, "XP granted: " + finalXP + " to player " + playerUuid + " for " + eventType + ":" + eventSource);
                 return true;
                 
+            } catch (IllegalArgumentException e) {
+                logger.error("Invalid argument processing XP gain for player " + playerUuid + ": " + e.getMessage(), e);
+                return false;
             } catch (Exception e) {
-                logger.error("Error processing XP gain for player " + playerUuid, e);
+                logger.error("Unexpected error processing XP gain for player " + playerUuid, e);
                 return false;
             }
         });
@@ -180,10 +179,10 @@ public class XPManager {
         String rateLimitKey = playerUuid + ":" + eventType + ":" + eventSource;
         Instant now = Instant.now();
         
-        // Check cooldown period (prevents rapid-fire farming)
-        Instant lastEvent = lastEventTime.get(rateLimitKey);
-        if (lastEvent != null) {
-            long secondsSinceLastEvent = ChronoUnit.SECONDS.between(lastEvent, now);
+        // Check in-memory cooldown first (fastest check)
+        if (lastEventTime.containsKey(rateLimitKey)) {
+            Instant lastTime = lastEventTime.get(rateLimitKey);
+            long secondsSinceLastEvent = ChronoUnit.SECONDS.between(lastTime, now);
             if (secondsSinceLastEvent < cooldownSeconds) {
                 debugLog("Rate limit: Cooldown not met for " + rateLimitKey + " (" + secondsSinceLastEvent + "s < " + cooldownSeconds + "s)");
                 return false;
@@ -194,7 +193,7 @@ public class XPManager {
         try {
             // Check events in the last minute
             int eventsLastMinute = sqlHandler.getXPEventCount(playerUuid, eventType, eventSource, 
-                                                             now.minus(1, ChronoUnit.MINUTES), now);
+                                                            now.minus(1, ChronoUnit.MINUTES), now);
             if (eventsLastMinute >= maxEventsPerMinute) {
                 debugLog("Rate limit: Too many events in last minute for " + rateLimitKey + " (" + eventsLastMinute + " >= " + maxEventsPerMinute + ")");
                 return false;
@@ -215,14 +214,21 @@ public class XPManager {
                 debugLog("Rate limit: Too many events in last day for " + rateLimitKey + " (" + eventsLastDay + " >= " + maxEventsPerDay + ")");
                 return false;
             }
-            
+        } catch (SQLException e) {
+            logger.error("Database error checking rate limiting for " + rateLimitKey + ": " + e.getMessage(), e);
+            // Allow the event if we can't check the database due to SQL issues
             return true;
-            
+        } catch (IllegalArgumentException e) {
+            logger.error("Invalid argument checking rate limiting for " + rateLimitKey + ": " + e.getMessage(), e);
+            // Allow the event if we can't check the database
+            return true;
         } catch (Exception e) {
-            logger.error("Error checking rate limiting for " + rateLimitKey, e);
-            // Fail safe - allow the event if we can't check the database
+            logger.error("Unexpected error checking rate limiting for " + rateLimitKey, e);
+            // Allow the event if we can't check the database
             return true;
         }
+        
+        return true;
     }
     
     /**
@@ -258,7 +264,7 @@ public class XPManager {
             default -> 1.0;
         };
         
-        return (int) (baseXP * modifier);
+        return Math.max(1, (int) Math.round(baseXP * modifier));
     }
     
     /**
@@ -268,15 +274,17 @@ public class XPManager {
      */
     private void recordXPEvent(XPEvent xpEvent) {
         try {
-            sqlHandler.saveXPEvent(xpEvent);
-            debugLog("XP event recorded: " + xpEvent.toString());
-        } catch (Exception e) {
-            logger.error("Failed to record XP event: " + xpEvent.toString(), e);
+            sqlHandler.recordXPEvent(xpEvent.getPlayerUuid(), xpEvent.getEventType(), 
+                                   xpEvent.getEventSource(), xpEvent.getXpGained(), 
+                                   xpEvent.getTimestamp(), xpEvent.getServerName(), 
+                                   xpEvent.getMetadata());
+        } catch (SQLException e) {
+            logger.error("Error recording XP event", e);
         }
     }
     
     /**
-     * Updates rate limiting tracking data
+     * Updates rate limiting tracking for a player
      * 
      * @param playerUuid The UUID of the player
      * @param eventType The type of event
@@ -285,175 +293,272 @@ public class XPManager {
     private void updateRateLimitingTracking(String playerUuid, String eventType, String eventSource) {
         String rateLimitKey = playerUuid + ":" + eventType + ":" + eventSource;
         lastEventTime.put(rateLimitKey, Instant.now());
+        
+        // Update event count
         eventCounts.merge(rateLimitKey, 1, Integer::sum);
     }
     
     /**
-     * Initializes the BlazeAndCaves advancement mappings
-     * This method loads all BlazeAndCaves 1.21 advancements with their XP values
+     * Initializes BlazeAndCaves advancement mappings
      */
     private void initializeBlazeAndCavesMappings() {
-        LoggingUtils.debugLog(logger, debugEnabled, "Initializing BlazeAndCaves advancement mappings for 1.21");
-        
-        // Load from configuration if available, otherwise use defaults
-        Map<String, Object> xpSection;
-        Object xpObj = config.getOrDefault("xp", new ConcurrentHashMap<>());
-        if (xpObj instanceof Map<?, ?>) {
-            xpSection = (Map<String, Object>) xpObj;
-        } else {
-            xpSection = new ConcurrentHashMap<>();
-        }
-        Map<String, Object> blazeConfig = (Map<String, Object>) xpSection.getOrDefault("blazeAndCaves", new ConcurrentHashMap<>());
-        
-        Map<String, Object> advancements = (Map<String, Object>) blazeConfig.getOrDefault("advancements", new ConcurrentHashMap<>());
-        
-        if (advancements.isEmpty()) {
-            // Load default BlazeAndCaves 1.21 mappings
-            loadDefaultBlazeAndCavesMappings();
-        } else {
-            // Load from configuration
-            loadBlazeAndCavesFromConfig(advancements);
+        if (!blazeAndCavesEnabled) {
+            debugLog("BlazeAndCaves integration disabled");
+            return;
         }
         
-        LoggingUtils.debugLog(logger, debugEnabled, "Loaded " + blazeAndCavesMap.size() + " BlazeAndCaves advancement mappings");
-    }
-    
-    /**
-     * Loads default BlazeAndCaves 1.21 advancement mappings
-     * This includes the most common and important advancements from the datapack
-     */
-    private void loadDefaultBlazeAndCavesMappings() {
-        // Sample of important BlazeAndCaves advancements - in production this would be a complete list
-        List<BlazeAndCavesAdvancement> defaultAdvancements = new ArrayList<>();
+        // Sample BlazeAndCaves advancements - this would typically be loaded from a config file
+        blazeAndCavesMap.put("blazeandcave:overworld/get_wood", 
+            new BlazeAndCavesAdvancement("blazeandcave:overworld/get_wood", "Getting Wood", 
+                                       "overworld", 10, false, false, "easy", "Get wood"));
         
-        // Easy advancements (10-25 XP)
-        defaultAdvancements.add(new BlazeAndCavesAdvancement("blazeandcave:overworld/wooden_tools", "Wooden Tools", "overworld", 10, false, false, "easy", "Craft all wooden tools"));
-        defaultAdvancements.add(new BlazeAndCavesAdvancement("blazeandcave:overworld/stone_tools", "Stone Tools", "overworld", 15, false, false, "easy", "Craft all stone tools"));
-        defaultAdvancements.add(new BlazeAndCavesAdvancement("blazeandcave:overworld/iron_tools", "Iron Tools", "overworld", 20, false, false, "easy", "Craft all iron tools"));
+        blazeAndCavesMap.put("blazeandcave:overworld/stone_age", 
+            new BlazeAndCavesAdvancement("blazeandcave:overworld/stone_age", "Stone Age", 
+                                       "overworld", 15, false, false, "easy", "Get stone"));
         
-        // Medium advancements (25-50 XP)
-        defaultAdvancements.add(new BlazeAndCavesAdvancement("blazeandcave:overworld/diamond_tools", "Diamond Tools", "overworld", 35, false, false, "medium", "Craft all diamond tools"));
-        defaultAdvancements.add(new BlazeAndCavesAdvancement("blazeandcave:overworld/netherite_tools", "Netherite Tools", "overworld", 50, false, false, "medium", "Craft all netherite tools"));
-        defaultAdvancements.add(new BlazeAndCavesAdvancement("blazeandcave:overworld/master_trader", "Master Trader", "overworld", 40, false, false, "medium", "Trade with every villager profession"));
+        blazeAndCavesMap.put("blazeandcave:nether/enter_nether", 
+            new BlazeAndCavesAdvancement("blazeandcave:nether/enter_nether", "Enter the Nether", 
+                                       "nether", 25, false, false, "medium", "Enter the Nether"));
         
-        // Hard advancements (50-100 XP)
-        defaultAdvancements.add(new BlazeAndCavesAdvancement("blazeandcave:end/elytra_superhero", "Elytra Superhero", "end", 75, false, false, "hard", "Fly 10000 blocks with elytra"));
-        defaultAdvancements.add(new BlazeAndCavesAdvancement("blazeandcave:nether/wither_boss", "Wither Boss", "nether", 80, false, false, "hard", "Defeat the Wither"));
-        defaultAdvancements.add(new BlazeAndCavesAdvancement("blazeandcave:end/dragon_slayer", "Dragon Slayer", "end", 90, false, false, "hard", "Defeat the Ender Dragon"));
+        blazeAndCavesMap.put("blazeandcave:end/enter_end", 
+            new BlazeAndCavesAdvancement("blazeandcave:end/enter_end", "Enter the End", 
+                                       "end", 50, false, false, "hard", "Enter the End"));
         
-        // Insane advancements (100+ XP)
-        defaultAdvancements.add(new BlazeAndCavesAdvancement("blazeandcave:end/the_end_complete", "The End Complete", "end", 150, false, false, "insane", "Complete all End advancements"));
-        defaultAdvancements.add(new BlazeAndCavesAdvancement("blazeandcave:overworld/all_blocks", "All Blocks", "overworld", 200, false, false, "insane", "Collect every block in the game"));
-        defaultAdvancements.add(new BlazeAndCavesAdvancement("blazeandcave:overworld/perfectionist", "Perfectionist", "overworld", 500, false, false, "insane", "Complete every advancement"));
+        blazeAndCavesMap.put("blazeandcave:end/kill_dragon", 
+            new BlazeAndCavesAdvancement("blazeandcave:end/kill_dragon", "Free the End", 
+                                       "end", 100, false, false, "insane", "Kill the Ender Dragon"));
         
-        // Terralith-specific advancements (10% bonus)
-        defaultAdvancements.add(new BlazeAndCavesAdvancement("blazeandcave:terralith/biome_explorer", "Biome Explorer", "terralith", 60, true, false, "medium", "Visit all Terralith biomes"));
-        defaultAdvancements.add(new BlazeAndCavesAdvancement("blazeandcave:terralith/structure_hunter", "Structure Hunter", "terralith", 45, true, false, "medium", "Find all Terralith structures"));
+        // Terralith variants
+        blazeAndCavesMap.put("blazeandcave:terralith/explore_biomes", 
+            new BlazeAndCavesAdvancement("blazeandcave:terralith/explore_biomes", "Biome Explorer", 
+                                       "terralith", 30, true, false, "medium", "Explore Terralith biomes"));
         
-        // Hardcore variants (50% bonus)
-        defaultAdvancements.add(new BlazeAndCavesAdvancement("blazeandcave:hardcore/hardcore_master", "Hardcore Master", "hardcore", 100, false, true, "insane", "Complete hardcore challenges"));
+        // Hardcore variants
+        blazeAndCavesMap.put("blazeandcave:hardcore/survive_nights", 
+            new BlazeAndCavesAdvancement("blazeandcave:hardcore/survive_nights", "Night Survivor", 
+                                       "hardcore", 40, false, true, "hard", "Survive nights in hardcore"));
         
-        // Add all advancements to the map
-        for (BlazeAndCavesAdvancement advancement : defaultAdvancements) {
-            blazeAndCavesMap.put(advancement.getNamespacedKey(), advancement);
-        }
-    }
-    
-    /**
-     * Loads BlazeAndCaves advancement mappings from configuration
-     * 
-     * @param advancements The advancement configuration map
-     */
-    @SuppressWarnings("unchecked")
-    private void loadBlazeAndCavesFromConfig(Map<String, Object> advancements) {
-        for (Map.Entry<String, Object> entry : advancements.entrySet()) {
-            try {
-                String namespacedKey = entry.getKey();
-                Map<String, Object> advConfig = (Map<String, Object>) entry.getValue();
-                
-                String displayName = advConfig.getOrDefault("displayName", namespacedKey).toString();
-                String category = advConfig.getOrDefault("category", "overworld").toString();
-                int baseXP = Integer.parseInt(advConfig.getOrDefault("baseXP", "10").toString());
-                boolean isTerralith = Boolean.parseBoolean(advConfig.getOrDefault("isTerralithVariant", "false").toString());
-                boolean isHardcore = Boolean.parseBoolean(advConfig.getOrDefault("isHardcoreVariant", "false").toString());
-                String difficulty = advConfig.getOrDefault("difficulty", "easy").toString();
-                String description = advConfig.getOrDefault("description", "").toString();
-                
-                BlazeAndCavesAdvancement advancement = new BlazeAndCavesAdvancement(
-                    namespacedKey, displayName, category, baseXP, isTerralith, isHardcore, difficulty, description
-                );
-                
-                blazeAndCavesMap.put(namespacedKey, advancement);
-                
-            } catch (Exception e) {
-                logger.error("Failed to load BlazeAndCaves advancement: " + entry.getKey(), e);
-            }
-        }
-    }
-    
-    /**
-     * Gets the total XP for a player
-     * 
-     * @param playerUuid The UUID of the player
-     * @return CompletableFuture that resolves to the player's total XP
-     */
-    public CompletableFuture<Integer> getPlayerTotalXP(String playerUuid) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                return sqlHandler.getPlayerTotalXP(playerUuid);
-            } catch (Exception e) {
-                logger.error("Error getting total XP for player " + playerUuid, e);
-                return 0;
-            }
-        });
+        debugLog("Initialized " + blazeAndCavesMap.size() + " BlazeAndCaves advancement mappings");
     }
     
     /**
      * Gets recent XP events for a player
      * 
      * @param playerUuid The UUID of the player
-     * @param limit The maximum number of events to return
-     * @return CompletableFuture that resolves to a list of recent XP events
+     * @param limit Maximum number of events to retrieve
+     * @return CompletableFuture that resolves to a List of XPEvent objects
      */
     public CompletableFuture<List<XPEvent>> getRecentXPEvents(String playerUuid, int limit) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 return sqlHandler.getRecentXPEvents(playerUuid, limit);
+            } catch (SQLException | IllegalArgumentException e) {
+                logger.error("Error getting recent XP events for player " + playerUuid + ": " + e.getMessage(), e);
+                return new ArrayList<>();
             } catch (Exception e) {
-                logger.error("Error getting recent XP events for player " + playerUuid, e);
+                logger.error("Unexpected error getting recent XP events for player " + playerUuid, e);
                 return new ArrayList<>();
             }
         });
     }
     
     /**
-     * Clears rate limiting data older than 24 hours
-     * This method should be called periodically to prevent memory leaks
+     * Gets XP statistics for a player
+     * 
+     * @param playerUuid The UUID of the player
+     * @param days Number of days to look back for statistics
+     * @return CompletableFuture that resolves to a Map containing XP statistics
+     */
+    public CompletableFuture<Map<String, Object>> getXPStatistics(String playerUuid, int days) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
+                int totalXP = sqlHandler.getPlayerXPSince(playerUuid, since);
+                Map<String, Integer> xpBySource = sqlHandler.getPlayerXPBySource(playerUuid, since);
+                Map<String, Integer> dailyXP = sqlHandler.getDailyXPBreakdown(playerUuid, days);
+                
+                Map<String, Object> statistics = new ConcurrentHashMap<>();
+                statistics.put("totalXP", totalXP);
+                statistics.put("xpBySource", xpBySource);
+                statistics.put("dailyXP", dailyXP);
+                statistics.put("days", days);
+                statistics.put("since", since.toString());
+                
+                return statistics;
+            } catch (SQLException | IllegalArgumentException e) {
+                logger.error("Error getting XP statistics for player " + playerUuid + ": " + e.getMessage(), e);
+                return new ConcurrentHashMap<String, Object>();
+            } catch (Exception e) {
+                logger.error("Unexpected error getting XP statistics for player " + playerUuid, e);
+                return new ConcurrentHashMap<String, Object>();
+            }
+        });
+    }
+    
+    /**
+     * Gets XP for a player since a specific time
+     * 
+     * @param playerUuid The UUID of the player
+     * @param since The timestamp to look back from
+     * @return CompletableFuture that resolves to the total XP amount since the given time
+     */
+    public CompletableFuture<Integer> getPlayerXPSince(String playerUuid, Instant since) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return sqlHandler.getPlayerXPSince(playerUuid, since);
+            } catch (SQLException | IllegalArgumentException e) {
+                logger.error("Error getting XP since " + since + " for player " + playerUuid + ": " + e.getMessage(), e);
+                return 0;
+            } catch (Exception e) {
+                logger.error("Unexpected error getting XP since " + since + " for player " + playerUuid, e);
+                return 0;
+            }
+        });
+    }
+
+    /**
+     * Gets XP breakdown by source for a player since a specific time
+     * 
+     * @param playerUuid The UUID of the player
+     * @param since The timestamp to look back from
+     * @return CompletableFuture that resolves to a Map of source to XP amount
+     */
+    public CompletableFuture<Map<String, Integer>> getPlayerXPBySource(String playerUuid, Instant since) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return sqlHandler.getPlayerXPBySource(playerUuid, since);
+            } catch (SQLException | IllegalArgumentException e) {
+                logger.error("Error getting XP by source for player " + playerUuid + ": " + e.getMessage(), e);
+                return new ConcurrentHashMap<String, Integer>();
+            } catch (Exception e) {
+                logger.error("Unexpected error getting XP by source for player " + playerUuid, e);
+                return new ConcurrentHashMap<String, Integer>();
+            }
+        });
+    }
+
+    /**
+     * Gets daily XP breakdown for a player
+     * 
+     * @param playerUuid The UUID of the player
+     * @param days Number of days to look back
+     * @return CompletableFuture that resolves to a Map of date string to XP amount
+     */
+    public CompletableFuture<Map<String, Integer>> getDailyXPBreakdown(String playerUuid, int days) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return sqlHandler.getDailyXPBreakdown(playerUuid, days);
+            } catch (SQLException | IllegalArgumentException e) {
+                logger.error("Error getting daily XP breakdown for player " + playerUuid + ": " + e.getMessage(), e);
+                return new ConcurrentHashMap<String, Integer>();
+            } catch (Exception e) {
+                logger.error("Unexpected error getting daily XP breakdown for player " + playerUuid, e);
+                return new ConcurrentHashMap<String, Integer>();
+            }
+        });
+    }
+
+    /**
+     * Gets the total XP for a player
+     * 
+     * @param playerUuid The UUID of the player
+     * @return CompletableFuture that resolves to the total XP amount
+     */
+    public CompletableFuture<Integer> getPlayerTotalXP(String playerUuid) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return sqlHandler.getPlayerTotalXP(playerUuid);
+            } catch (SQLException | IllegalArgumentException e) {
+                logger.error("Error getting total XP for player " + playerUuid + ": " + e.getMessage(), e);
+                return 0;
+            } catch (Exception e) {
+                logger.error("Unexpected error getting total XP for player " + playerUuid, e);
+                return 0;
+            }
+        });
+    }
+    
+    /**
+     * Clears old rate limiting data to prevent memory leaks
      */
     public void cleanupRateLimitingData() {
-        Instant cutoff = Instant.now().minus(1, ChronoUnit.DAYS);
-        lastEventTime.entrySet().removeIf(entry -> entry.getValue().isBefore(cutoff));
-        debugLog("Cleaned up old rate limiting data");
+        try {
+            Instant cutoff = Instant.now().minus(1, ChronoUnit.DAYS);
+            lastEventTime.entrySet().removeIf(entry -> entry.getValue().isBefore(cutoff));
+            
+            // Reset event counts periodically
+            eventCounts.clear();
+            
+            debugLog("Cleaned up rate limiting data");
+        } catch (UnsupportedOperationException e) {
+            logger.error("Unsupported operation during rate limiting cleanup: " + e.getMessage(), e);
+        } catch (IllegalStateException e) {
+            logger.error("Illegal state during rate limiting cleanup: " + e.getMessage(), e);
+        } catch (Exception e) {
+            logger.error("Unexpected error cleaning up rate limiting data", e);
+        }
+    }
+    
+    /**
+     * Gets rate limiting information for a player
+     * 
+     * @param playerUuid The UUID of the player
+     * @return Map containing rate limiting status information
+     */
+    public Map<String, Object> getRateLimitingInfo(String playerUuid) {
+        Map<String, Object> info = new ConcurrentHashMap<>();
+        
+        info.put("rateLimitingEnabled", rateLimitingEnabled);
+        info.put("cooldownSeconds", cooldownSeconds);
+        info.put("maxEventsPerMinute", maxEventsPerMinute);
+        info.put("maxEventsPerHour", maxEventsPerHour);
+        info.put("maxEventsPerDay", maxEventsPerDay);
+        
+        // Get current event counts from memory
+        long activeKeys = lastEventTime.entrySet().stream()
+            .filter(entry -> entry.getKey().startsWith(playerUuid + ":"))
+            .filter(entry -> entry.getValue().isAfter(Instant.now().minus(1, ChronoUnit.HOURS)))
+            .count();
+        
+        info.put("activeRateLimitKeys", activeKeys);
+        
+        return info;
+    }
+    
+    /**
+     * Logs debug messages if debug mode is enabled
+     * 
+     * @param message The message to log
+     */
+    private void debugLog(String message) {
+        LoggingUtils.debugLog(logger, debugEnabled, "[XPManager] " + message);
+    }
+    
+    /**
+     * Gets the XP configuration section
+     * 
+     * @return The XP configuration map
+     */
+    public Map<String, Object> getXPConfiguration() {
+        return xpSection;
+    }
+    
+    /**
+     * Checks if BlazeAndCaves integration is enabled
+     * 
+     * @return True if BlazeAndCaves integration is enabled
+     */
+    public boolean isBlazeAndCavesEnabled() {
+        return blazeAndCavesEnabled;
     }
     
     /**
      * Gets a BlazeAndCaves advancement by its namespaced key
      * 
      * @param namespacedKey The namespaced key of the advancement
-     * @return The BlazeAndCaves advancement, or null if not found
+     * @return Optional containing the advancement, or empty if not found
      */
-    public BlazeAndCavesAdvancement getBlazeAndCavesAdvancement(String namespacedKey) {
-        return blazeAndCavesMap.get(namespacedKey);
-    }
-    
-    /**
-     * Logs a debug message if debug mode is enabled
-     * 
-     * @param message The message to log
-     */
-    private void debugLog(String message) {
-        if (debugEnabled) {
-            logger.info("[XPManager] " + message);
-        }
+    public java.util.Optional<BlazeAndCavesAdvancement> getBlazeAndCavesAdvancement(String namespacedKey) {
+        return java.util.Optional.ofNullable(blazeAndCavesMap.get(namespacedKey));
     }
 }
