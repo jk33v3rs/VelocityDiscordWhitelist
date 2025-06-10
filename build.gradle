@@ -3,7 +3,7 @@ plugins {
     id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
 
-version = '1.0.2'
+version = '1.0.3'
 
 repositories {
     mavenCentral()
@@ -43,19 +43,20 @@ dependencies {
     implementation 'com.zaxxer:HikariCP:5.1.0'
     compileOnly 'net.milkbowl.vault:VaultUnlockedAPI:2.10'
     implementation 'org.yaml:snakeyaml:2.2'
-    implementation 'org.slf4j:slf4j-api:2.0.12'
-    implementation 'org.slf4j:slf4j-simple:2.0.12'
+    // Removed slf4j dependencies - Velocity provides them
 }
 
 shadowJar {
     archiveClassifier.set('all')
+    
+    // Relocate dependencies to avoid conflicts
     relocate 'org.bstats', 'top.jk33v3rs.velocitydiscordwhitelist.bstats'
     relocate 'org.yaml.snakeyaml', 'top.jk33v3rs.velocitydiscordwhitelist.yaml'
     relocate 'org.sqlite', 'top.jk33v3rs.velocitydiscordwhitelist.sqlite'
     relocate 'org.mariadb.jdbc', 'top.jk33v3rs.velocitydiscordwhitelist.mariadb.jdbc'
     relocate 'com.zaxxer.hikari', 'top.jk33v3rs.velocitydiscordwhitelist.hikari'
     relocate 'net.dv8tion.jda', 'top.jk33v3rs.velocitydiscordwhitelist.jda'
-    relocate 'org.slf4j', 'top.jk33v3rs.velocitydiscordwhitelist.slf4j'
+    // Removed slf4j relocation - use Velocity's SLF4J
     
     // Exclude unnecessary components to reduce size
     exclude 'META-INF/versions/**'

@@ -125,7 +125,7 @@ public class BlazeAndCavesAdvancement {
      * @param terralithVariant True if this is a Terralith-specific advancement
      */
     public void setTerralithVariant(boolean terralithVariant) {
-        isTerralithVariant = terralithVariant;
+        this.isTerralithVariant = terralithVariant;
     }
     
     /**
@@ -143,7 +143,7 @@ public class BlazeAndCavesAdvancement {
      * @param hardcoreVariant True if this is a Hardcore-specific advancement
      */
     public void setHardcoreVariant(boolean hardcoreVariant) {
-        isHardcoreVariant = hardcoreVariant;
+        this.isHardcoreVariant = hardcoreVariant;
     }
     
     /**
@@ -202,20 +202,11 @@ public class BlazeAndCavesAdvancement {
      * @param hardcoreBonus Bonus multiplier for Hardcore variants
      * @return The final XP value including all modifiers
      */
-    /**
-     * Calculates the final XP value with configurable difficulty and variant modifiers
-     *
-     * @param easyMultiplier Multiplier for easy difficulty
-     * @param mediumMultiplier Multiplier for medium difficulty
-     * @param hardMultiplier Multiplier for hard difficulty
-     * @param insaneMultiplier Multiplier for insane difficulty
-     * @param terralithBonus Bonus multiplier for Terralith variants
-     * @param hardcoreBonus Bonus multiplier for Hardcore variants
-     * @return The final XP value including all modifiers
-     */
     public int getFinalXP(double easyMultiplier, double mediumMultiplier, double hardMultiplier, 
                          double insaneMultiplier, double terralithBonus, double hardcoreBonus) {
         double finalXP = baseXP;
+        
+        // Apply difficulty multipliers
         if (difficulty != null) {
             switch (difficulty.toLowerCase()) {
                 case "easy":
@@ -235,6 +226,7 @@ public class BlazeAndCavesAdvancement {
                     break;
             }
         }
+        
         // Apply variant bonuses
         if (isTerralithVariant) {
             finalXP = finalXP * (1.0 + terralithBonus);
@@ -242,6 +234,7 @@ public class BlazeAndCavesAdvancement {
         if (isHardcoreVariant) {
             finalXP = finalXP * (1.0 + hardcoreBonus);
         }
+        
         return (int) finalXP;
     }
     
@@ -252,7 +245,7 @@ public class BlazeAndCavesAdvancement {
      * @return True if the keys match
      */
     public boolean matches(String key) {
-        return namespacedKey.equals(key);
+        return namespacedKey != null && namespacedKey.equals(key);
     }
     
     @Override

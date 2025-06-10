@@ -1,4 +1,5 @@
-# VelocityDiscordWhitelist Configuration v1.0.2
+# VelocityDiscordWhitelist Configuration v1.0.3
+
 # Database Configuration
 database:
   host: "localhost"
@@ -27,6 +28,74 @@ settings:
   kick-non-whitelisted: true
   purgatory-enabled: true
   purgatory-cleanup-minutes: 5
+
+# Session Configuration
+session:
+  timeout:
+    minutes: 30
+
+# Geyser Integration (for Bedrock Edition support)
+geyser:
+  enabled: false
+  server: "bedrock"
+
+# Vault Integration (Economy and Permissions)
+vault:
+  economy:
+    enabled: false
+    whitelist_reward: 1000
+    rank_base_reward: 500
+    subrank_multiplier: 0.5
+    mainrank_multiplier: 2.0
+  permissions:
+    enabled: false
+  reward_server: "survival"
+
+# LuckPerms Integration
+luckperms:
+  enabled: false
+  default_group: "verified"
+  managed_groups:
+    - "bystander"
+    - "onlooker"
+    - "wanderer"
+    - "traveller"
+    - "explorer"
+    - "verified"
+  discord_role_mappings:
+    "discord-role-id-1": "luckperms-group-1"
+    "discord-role-id-2": "luckperms-group-2"
+
+# XP System Configuration
+xp:
+  enabled: true
+  rateLimiting:
+    enabled: true
+    maxEventsPerMinute: 10
+    maxEventsPerHour: 100
+    maxEventsPerDay: 500
+    cooldownSeconds: 5
+  modifiers:
+    advancement: 1.0
+    playtime: 0.5
+    kill: 0.8
+    break_block: 0.3
+    place_block: 0.2
+    craft_item: 0.4
+    enchant_item: 1.2
+    trade: 0.6
+    fishing: 0.4
+    mining: 0.3
+  blazeAndCaves:
+    enabled: true
+    difficultyMultipliers:
+      easy: 1.0
+      medium: 1.25
+      hard: 1.5
+      insane: 2.0
+    variantBonuses:
+      terralith: 0.1
+      hardcore: 0.5
 
 # Messages
 messages:

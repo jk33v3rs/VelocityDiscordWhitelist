@@ -80,25 +80,142 @@ public class YamlConfigLoader {
         
         // Database configuration
         Map<String, Object> database = new LinkedHashMap<>();
-        database.put("host", "localhost");
-        database.put("port", 3306);
-        database.put("database", "whitelist");
+        database.put("url", "jdbc:mysql://localhost:3306/discord_whitelist");
         database.put("username", "root");
         database.put("password", "password");
+        
+        Map<String, Object> connectionPool = new LinkedHashMap<>();
+        connectionPool.put("maximum_pool_size", 10);
+        connectionPool.put("minimum_idle", 5);
+        connectionPool.put("connection_timeout", 30000);
+        connectionPool.put("idle_timeout", 600000);
+        connectionPool.put("max_lifetime", 1800000);
+        database.put("connection_pool", connectionPool);
+        
         defaultConfig.put("database", database);
         
         // Discord configuration
         Map<String, Object> discord = new LinkedHashMap<>();
-        discord.put("token", "your-bot-token-here");
-        discord.put("guild-id", "your-guild-id-here");
-        discord.put("channel-id", "your-channel-id-here");
+        discord.put("token", "YOUR_BOT_TOKEN_HERE");
+        discord.put("guild_id", "123456789012345678");
+        discord.put("verification_channel", "123456789012345678");
+        
+        Map<String, Object> roles = new LinkedHashMap<>();
+        roles.put("admin", "987654321098765432");
+        roles.put("member", "876543210987654321");
+        roles.put("verified", "765432109876543210");
+        discord.put("roles", roles);
+        
         defaultConfig.put("discord", discord);
+        
+        // Plugin Settings
+        Map<String, Object> settings = new LinkedHashMap<>();
+        settings.put("debug", false);
+        settings.put("use_purgatory", true);
+        settings.put("purgatory_server", "lobby");
+        settings.put("allow_reconnect", true);
+        settings.put("max_verification_attempts", 3);
+        defaultConfig.put("settings", settings);
+        
+        // Session Configuration
+        Map<String, Object> session = new LinkedHashMap<>();
+        session.put("timeout", 15);
+        defaultConfig.put("session", session);
+        
+        // Geyser Integration
+        Map<String, Object> geyser = new LinkedHashMap<>();
+        geyser.put("enabled", false);
+        geyser.put("handle_bedrock_players", true);
+        geyser.put("auto_verify_bedrock", false);
+        defaultConfig.put("geyser", geyser);
+        
+        // Vault Integration
+        Map<String, Object> vault = new LinkedHashMap<>();
+        Map<String, Object> economy = new LinkedHashMap<>();
+        economy.put("enabled", false);
+        economy.put("whitelist_reward", 100.0);
+        economy.put("rank_progression_reward", 50.0);
+        vault.put("economy", economy);
+        
+        Map<String, Object> permissions = new LinkedHashMap<>();
+        permissions.put("enabled", false);
+        vault.put("permissions", permissions);
+        
+        vault.put("reward_server", "survival");
+        defaultConfig.put("vault", vault);
+        
+        // LuckPerms Integration
+        Map<String, Object> luckperms = new LinkedHashMap<>();
+        luckperms.put("enabled", false);
+        defaultConfig.put("luckperms", luckperms);
+        
+        // XP System Configuration
+        Map<String, Object> xp = new LinkedHashMap<>();
+        
+        Map<String, Object> rateLimiting = new LinkedHashMap<>();
+        rateLimiting.put("enabled", true);
+        rateLimiting.put("maxEventsPerMinute", 10);
+        rateLimiting.put("maxEventsPerHour", 100);
+        rateLimiting.put("maxEventsPerDay", 500);
+        rateLimiting.put("cooldownSeconds", 5);
+        xp.put("rateLimiting", rateLimiting);
+        
+        Map<String, Object> modifiers = new LinkedHashMap<>();
+        modifiers.put("advancement", 1.0);
+        modifiers.put("playtime", 0.5);
+        modifiers.put("kill", 0.8);
+        modifiers.put("break_block", 0.3);
+        modifiers.put("place_block", 0.2);
+        modifiers.put("craft_item", 0.4);
+        modifiers.put("enchant_item", 1.2);
+        modifiers.put("trade", 0.6);
+        modifiers.put("fishing", 0.4);
+        modifiers.put("mining", 0.3);
+        xp.put("modifiers", modifiers);
+        
+        Map<String, Object> blazeAndCaves = new LinkedHashMap<>();
+        blazeAndCaves.put("enabled", true);
+        
+        Map<String, Object> difficultyMultipliers = new LinkedHashMap<>();
+        difficultyMultipliers.put("easy", 1.0);
+        difficultyMultipliers.put("medium", 1.25);
+        difficultyMultipliers.put("hard", 1.5);
+        difficultyMultipliers.put("insane", 2.0);
+        blazeAndCaves.put("difficultyMultipliers", difficultyMultipliers);
+        
+        Map<String, Object> variantBonuses = new LinkedHashMap<>();
+        variantBonuses.put("terralith", 0.1);
+        variantBonuses.put("hardcore", 0.5);
+        blazeAndCaves.put("variantBonuses", variantBonuses);
+        
+        // Empty advancement mappings - will be populated with defaults if not configured
+        blazeAndCaves.put("advancements", new LinkedHashMap<>());
+        
+        xp.put("blazeAndCaves", blazeAndCaves);
+        defaultConfig.put("xp", xp);
         
         // Message configuration
         Map<String, Object> messages = new LinkedHashMap<>();
-        messages.put("prefix", "&8[&bWhitelist&8]&r ");
-        messages.put("not-whitelisted", "&cYou are not whitelisted on this server!");
-        messages.put("no-permission", "&cYou don't have permission to use this command!");
+        messages.put("verification_code", "Your verification code is: %code%");
+        messages.put("verification_success", "Verification successful! Welcome to the server!");
+        messages.put("verification_failed", "Verification failed. Please try again.");
+        messages.put("session_expired", "Your verification session has expired. Please request a new code.");
+        messages.put("already_verified", "You are already verified on this server.");
+        messages.put("purgatory_message", "You are in purgatory mode. Please verify your Discord account to continue.");
+        messages.put("invalid_code", "Invalid verification code. Please check and try again.");
+        messages.put("max_attempts_exceeded", "Maximum verification attempts exceeded. Please request a new code.");
+        messages.put("discord_link_success", "Your Discord account has been successfully linked!");
+        messages.put("discord_already_linked", "Your Discord account is already linked to another player.");
+        messages.put("whitelist_added", "You have been added to the whitelist!");
+        messages.put("whitelist_removed", "You have been removed from the whitelist.");
+        messages.put("not_whitelisted", "You are not whitelisted on this server.");
+        messages.put("database_error", "A database error occurred. Please try again later.");
+        messages.put("permission_denied", "You do not have permission to use this command.");
+        messages.put("player_not_found", "Player not found.");
+        messages.put("discord_user_not_found", "Discord user not found.");
+        messages.put("command_usage", "Usage: %usage%");
+        messages.put("reload_success", "Configuration reloaded successfully!");
+        messages.put("reload_failed", "Failed to reload configuration. Check console for errors.");
         defaultConfig.put("messages", messages);
         
         // Save the default config

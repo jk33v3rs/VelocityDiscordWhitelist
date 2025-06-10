@@ -310,36 +310,10 @@ public class RankCommand {
         if (seconds < 60) {
             return seconds + "s ago";
         } else if (seconds < 3600) {
-            return (seconds / 60) + "m ago";
-        } else if (seconds < 86400) {
+            return (seconds / 60) + "m ago";        } else if (seconds < 86400) {
             return (seconds / 3600) + "h ago";
         } else {
             return (seconds / 86400) + "d ago";
         }
-    }
-    
-    /**
-     * formatXPEventType
-     * Formats an XP event type for display in user messages.
-     * Converts internal event type names to user-friendly display names.
-     *
-     * @param eventType The internal event type string
-     * @return A formatted, user-friendly event type name
-     */
-    private String formatXPEventType(String eventType) {
-        return switch (eventType) {
-            case "ADVANCEMENT" -> "Advancement";
-            case "BLAZE_AND_CAVE" -> "BlazeAndCave Achievement";
-            case "PLAYTIME" -> "Play Time";
-            case "KILL" -> "Monster Kill";
-            case "BREAK_BLOCK" -> "Block Break";
-            case "PLACE_BLOCK" -> "Block Place";
-            case "CRAFT_ITEM" -> "Item Craft";
-            case "ENCHANT_ITEM" -> "Item Enchant";
-            case "TRADE" -> "Villager Trade";
-            case "FISHING" -> "Fishing";
-            case "MINING" -> "Mining";
-            default -> eventType; // Return as-is if unknown
-        };
     }
 }

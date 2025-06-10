@@ -349,14 +349,10 @@ public class XPManager {
      * @return CompletableFuture that resolves to a List of XPEvent objects
      */
     public CompletableFuture<List<XPEvent>> getRecentXPEvents(String playerUuid, int limit) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
+        return CompletableFuture.supplyAsync(() -> {            try {
                 return sqlHandler.getRecentXPEvents(playerUuid, limit);
-            } catch (SQLException | IllegalArgumentException e) {
-                logger.error("Error getting recent XP events for player " + playerUuid + ": " + e.getMessage(), e);
-                return new ArrayList<>();
             } catch (Exception e) {
-                logger.error("Unexpected error getting recent XP events for player " + playerUuid, e);
+                logger.error("Error getting recent XP events for player " + playerUuid + ": " + e.getMessage(), e);
                 return new ArrayList<>();
             }
         });
@@ -370,8 +366,7 @@ public class XPManager {
      * @return CompletableFuture that resolves to a Map containing XP statistics
      */
     public CompletableFuture<Map<String, Object>> getXPStatistics(String playerUuid, int days) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
+        return CompletableFuture.supplyAsync(() -> {            try {
                 Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
                 int totalXP = sqlHandler.getPlayerXPSince(playerUuid, since);
                 Map<String, Integer> xpBySource = sqlHandler.getPlayerXPBySource(playerUuid, since);
@@ -385,11 +380,8 @@ public class XPManager {
                 statistics.put("since", since.toString());
                 
                 return statistics;
-            } catch (SQLException | IllegalArgumentException e) {
-                logger.error("Error getting XP statistics for player " + playerUuid + ": " + e.getMessage(), e);
-                return new ConcurrentHashMap<String, Object>();
             } catch (Exception e) {
-                logger.error("Unexpected error getting XP statistics for player " + playerUuid, e);
+                logger.error("Error getting XP statistics for player " + playerUuid + ": " + e.getMessage(), e);
                 return new ConcurrentHashMap<String, Object>();
             }
         });
@@ -403,14 +395,10 @@ public class XPManager {
      * @return CompletableFuture that resolves to the total XP amount since the given time
      */
     public CompletableFuture<Integer> getPlayerXPSince(String playerUuid, Instant since) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
+        return CompletableFuture.supplyAsync(() -> {            try {
                 return sqlHandler.getPlayerXPSince(playerUuid, since);
-            } catch (SQLException | IllegalArgumentException e) {
-                logger.error("Error getting XP since " + since + " for player " + playerUuid + ": " + e.getMessage(), e);
-                return 0;
             } catch (Exception e) {
-                logger.error("Unexpected error getting XP since " + since + " for player " + playerUuid, e);
+                logger.error("Error getting XP since " + since + " for player " + playerUuid + ": " + e.getMessage(), e);
                 return 0;
             }
         });
@@ -424,14 +412,10 @@ public class XPManager {
      * @return CompletableFuture that resolves to a Map of source to XP amount
      */
     public CompletableFuture<Map<String, Integer>> getPlayerXPBySource(String playerUuid, Instant since) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
+        return CompletableFuture.supplyAsync(() -> {            try {
                 return sqlHandler.getPlayerXPBySource(playerUuid, since);
-            } catch (SQLException | IllegalArgumentException e) {
-                logger.error("Error getting XP by source for player " + playerUuid + ": " + e.getMessage(), e);
-                return new ConcurrentHashMap<String, Integer>();
             } catch (Exception e) {
-                logger.error("Unexpected error getting XP by source for player " + playerUuid, e);
+                logger.error("Error getting XP by source for player " + playerUuid + ": " + e.getMessage(), e);
                 return new ConcurrentHashMap<String, Integer>();
             }
         });
@@ -445,41 +429,39 @@ public class XPManager {
      * @return CompletableFuture that resolves to a Map of date string to XP amount
      */
     public CompletableFuture<Map<String, Integer>> getDailyXPBreakdown(String playerUuid, int days) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
+        return CompletableFuture.supplyAsync(() -> {            try {
                 return sqlHandler.getDailyXPBreakdown(playerUuid, days);
-            } catch (SQLException | IllegalArgumentException e) {
+            } catch (Exception e) {
                 logger.error("Error getting daily XP breakdown for player " + playerUuid + ": " + e.getMessage(), e);
                 return new ConcurrentHashMap<String, Integer>();
-            } catch (Exception e) {
-                logger.error("Unexpected error getting daily XP breakdown for player " + playerUuid, e);
-                return new ConcurrentHashMap<String, Integer>();
             }
-        });
-    }
-
+        });    }
+    
     /**
-     * Gets the total XP for a player
+     * getPlayerTotalXP
      * 
-     * @param playerUuid The UUID of the player
-     * @return CompletableFuture that resolves to the total XP amount
+     * Retrieves the total XP accumulated by a player using their UUID string.
+     * This method queries the database for the player's total XP amount.
+     * 
+     * @param playerUuid The player's UUID as a string representation
+     * @return CompletableFuture<Integer> containing the total XP amount, or 0 if player not found
      */
     public CompletableFuture<Integer> getPlayerTotalXP(String playerUuid) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 return sqlHandler.getPlayerTotalXP(playerUuid);
-            } catch (SQLException | IllegalArgumentException e) {
-                logger.error("Error getting total XP for player " + playerUuid + ": " + e.getMessage(), e);
-                return 0;
             } catch (Exception e) {
-                logger.error("Unexpected error getting total XP for player " + playerUuid, e);
+                logger.error("Error getting total XP for player " + playerUuid + ": " + e.getMessage(), e);
                 return 0;
             }
         });
     }
     
     /**
-     * Clears old rate limiting data to prevent memory leaks
+     * cleanupRateLimitingData
+     * 
+     * Clears old rate limiting data to prevent memory leaks.
+     * Removes entries older than 1 day and resets event counts.
      */
     public void cleanupRateLimitingData() {
         try {
@@ -490,17 +472,15 @@ public class XPManager {
             eventCounts.clear();
             
             debugLog("Cleaned up rate limiting data");
-        } catch (UnsupportedOperationException e) {
-            logger.error("Unsupported operation during rate limiting cleanup: " + e.getMessage(), e);
-        } catch (IllegalStateException e) {
-            logger.error("Illegal state during rate limiting cleanup: " + e.getMessage(), e);
         } catch (Exception e) {
-            logger.error("Unexpected error cleaning up rate limiting data", e);
+            logger.error("Error cleaning up rate limiting data", e);
         }
     }
     
     /**
-     * Gets rate limiting information for a player
+     * getRateLimitingInfo
+     * 
+     * Gets rate limiting information for a player.
      * 
      * @param playerUuid The UUID of the player
      * @return Map containing rate limiting status information
@@ -526,7 +506,9 @@ public class XPManager {
     }
     
     /**
-     * Logs debug messages if debug mode is enabled
+     * debugLog
+     * 
+     * Logs debug messages if debug mode is enabled.
      * 
      * @param message The message to log
      */
@@ -535,7 +517,9 @@ public class XPManager {
     }
     
     /**
-     * Gets the XP configuration section
+     * getXPConfiguration
+     * 
+     * Gets the XP configuration section.
      * 
      * @return The XP configuration map
      */
@@ -544,7 +528,9 @@ public class XPManager {
     }
     
     /**
-     * Checks if BlazeAndCaves integration is enabled
+     * isBlazeAndCavesEnabled
+     * 
+     * Checks if BlazeAndCaves integration is enabled.
      * 
      * @return True if BlazeAndCaves integration is enabled
      */
@@ -553,7 +539,9 @@ public class XPManager {
     }
     
     /**
-     * Gets a BlazeAndCaves advancement by its namespaced key
+     * getBlazeAndCavesAdvancement
+     * 
+     * Gets a BlazeAndCaves advancement by its namespaced key.
      * 
      * @param namespacedKey The namespaced key of the advancement
      * @return Optional containing the advancement, or empty if not found

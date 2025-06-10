@@ -44,6 +44,10 @@ import top.jk33v3rs.velocitydiscordwhitelist.config.YamlConfigLoader;
 import top.jk33v3rs.velocitydiscordwhitelist.database.SQLHandler;
 import top.jk33v3rs.velocitydiscordwhitelist.integrations.LuckPermsIntegration;
 import top.jk33v3rs.velocitydiscordwhitelist.integrations.VaultIntegration;
+import top.jk33v3rs.velocitydiscordwhitelist.modules.DiscordBotHandler;
+import top.jk33v3rs.velocitydiscordwhitelist.modules.EnhancedPurgatoryManager;
+import top.jk33v3rs.velocitydiscordwhitelist.modules.RewardsHandler;
+import top.jk33v3rs.velocitydiscordwhitelist.modules.XPManager;
 import top.jk33v3rs.velocitydiscordwhitelist.utils.LoggingUtils;
 
 /** Main VelocityDiscordWhitelist plugin class. */
