@@ -16,6 +16,7 @@ import top.jk33v3rs.velocitydiscordwhitelist.models.PlayerRank;
 import top.jk33v3rs.velocitydiscordwhitelist.models.RankDefinition;
 import top.jk33v3rs.velocitydiscordwhitelist.models.RankRewards;
 import top.jk33v3rs.velocitydiscordwhitelist.utils.LoggingUtils;
+import top.jk33v3rs.velocitydiscordwhitelist.utils.ExceptionHandler;
 
 
 /**
@@ -27,6 +28,7 @@ public class RewardsHandler {
     private final DiscordBotHandler discordBotHandler;
     private final Logger logger;
     private final boolean debugEnabled;
+    private final ExceptionHandler exceptionHandler;
     private final Map<String, PlayerRank> playerRanksCache = new ConcurrentHashMap<>();
     private final Map<Integer, RankDefinition> rankDefinitionsCache = new ConcurrentHashMap<>();
     private final boolean rewardsEnabled;
@@ -44,14 +46,14 @@ public class RewardsHandler {
      * @param config The main configuration map
      * @param vaultIntegration The Vault integration (can be null)
      * @param luckPermsIntegration The LuckPerms integration (can be null)
-     */
-    public RewardsHandler(SQLHandler sqlHandler, DiscordBotHandler discordBotHandler, Logger logger, 
+     */    public RewardsHandler(SQLHandler sqlHandler, DiscordBotHandler discordBotHandler, Logger logger, 
                          boolean debugEnabled, Map<String, Object> config, 
                          VaultIntegration vaultIntegration, LuckPermsIntegration luckPermsIntegration) {
         this.sqlHandler = sqlHandler;
         this.discordBotHandler = discordBotHandler;
         this.logger = logger;
         this.debugEnabled = debugEnabled;
+        this.exceptionHandler = new ExceptionHandler(logger, debugEnabled);
         this.vaultIntegration = vaultIntegration;
         this.luckPermsIntegration = luckPermsIntegration;
         
@@ -244,13 +246,12 @@ public class RewardsHandler {
                     // Update cache
                     playerRanksCache.put(playerUuid, playerRank);
                     
-                    future.complete(didRankUp);
-                } catch (Exception e) {
-                    logger.error("Failed to add XP for player " + playerUuid, e);
+                    future.complete(didRankUp);                } catch (Exception e) {
+                    exceptionHandler.handleIntegrationException("RewardsHandler", "adding XP for player " + playerUuid, e);
                     future.completeExceptionally(e);
                 }
             }).exceptionally(e -> {
-                logger.error("Error getting player rank for XP addition", e);
+                exceptionHandler.handleIntegrationException("RewardsHandler", "getting player rank for XP addition", e);
                 future.completeExceptionally(e);
                 return null;
             });

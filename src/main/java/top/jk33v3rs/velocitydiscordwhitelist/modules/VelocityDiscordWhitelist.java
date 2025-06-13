@@ -19,7 +19,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.bstats.velocity.Metrics;
@@ -44,27 +43,24 @@ import top.jk33v3rs.velocitydiscordwhitelist.config.YamlConfigLoader;
 import top.jk33v3rs.velocitydiscordwhitelist.database.SQLHandler;
 import top.jk33v3rs.velocitydiscordwhitelist.integrations.LuckPermsIntegration;
 import top.jk33v3rs.velocitydiscordwhitelist.integrations.VaultIntegration;
-import top.jk33v3rs.velocitydiscordwhitelist.modules.DiscordBotHandler;
-import top.jk33v3rs.velocitydiscordwhitelist.modules.EnhancedPurgatoryManager;
-import top.jk33v3rs.velocitydiscordwhitelist.modules.RewardsHandler;
-import top.jk33v3rs.velocitydiscordwhitelist.modules.XPManager;
+import top.jk33v3rs.velocitydiscordwhitelist.utils.ExceptionHandler;
 import top.jk33v3rs.velocitydiscordwhitelist.utils.LoggingUtils;
 
 /** Main VelocityDiscordWhitelist plugin class. */
 @Plugin(
         id = "velocitydiscordwhitelist",
         name = "VelocityDiscordWhitelist",
-        version = "1.0.2",
+        version = "1.0.4",
         url = "https://github.com/jk33v3rs/VelocityDiscordWhitelist",
         description = "A whitelist plugin for Velocity that integrates with Discord",
         authors = {"jk33v3rs"}
 )
-public class VelocityDiscordWhitelist {
-    private final ProxyServer server;
+public class VelocityDiscordWhitelist {    private final ProxyServer server;
     private final org.slf4j.Logger logger;
     private final Path dataDirectory;
     private final Path configFile;
-    private final Metrics.Factory metricsFactory;      // Components
+    @SuppressWarnings("unused") // Keep for future use with metrics
+    private final Metrics.Factory metricsFactory;// Components
     private SQLHandler sqlHandler;
     private YamlConfigLoader configLoader;
     private Map<String, Object> config;
@@ -73,10 +69,10 @@ public class VelocityDiscordWhitelist {
     private DiscordBotHandler discordBotHandler;
     private RewardsHandler rewardsHandler;
     private XPManager xpManager;
-    private BrigadierCommandHandler commandHandler;
-    private VaultIntegration vaultIntegration;
+    private BrigadierCommandHandler commandHandler;    private VaultIntegration vaultIntegration;
     private LuckPermsIntegration luckPermsIntegration;
     private ScheduledTask purgatoryCleanupTask;
+    private ExceptionHandler exceptionHandler;
     
     // Configuration
     private final AtomicBoolean pluginEnabled = new AtomicBoolean(false);
@@ -106,12 +102,14 @@ public class VelocityDiscordWhitelist {
      * It registers commands, loads the configuration, and initializes database.
      *
      * @param event The ProxyInitializeEvent.
-     */
-    @Subscribe
+     */    @Subscribe
     public void onProxyInitialization(ProxyInitializeEvent event) {
         try {
             loadConfig();
             initializeDatabase();
+            
+            // Initialize exception handler after config is loaded
+            this.exceptionHandler = new ExceptionHandler(logger, debugEnabled);
             
             // Initialize integration handlers
             try {
@@ -188,11 +186,10 @@ public class VelocityDiscordWhitelist {
             
             // Register event listeners
             server.getEventManager().register(this, this);
-            
-            logger.info("VelocityDiscordWhitelist plugin has been enabled!");
+              logger.info("VelocityDiscordWhitelist plugin has been enabled!");
             
         } catch (ClassNotFoundException | SQLException e) {
-            logger.error("Failed to initialize plugin", e);
+            exceptionHandler.handleIntegrationException("Plugin", "initialization", e);
             // Don't disable the plugin completely, just log the error
         }
     }    @Subscribe
@@ -282,33 +279,22 @@ public class VelocityDiscordWhitelist {
                 player.sendMessage(Component.text(
                     "You must complete verification before connecting to other servers. Use /verify with your code.",
                     net.kyori.adventure.text.format.NamedTextColor.RED
-                ));
-            }
+                ));            }
         }
     }
-      private void startPurgatoryCleanupTask() {
-        // Schedule a task to periodically clean up expired sessions
-        purgatoryCleanupTask = server.getScheduler()
-            .buildTask(this, () -> {
-                // The actual cleanup happens in the EnhancedPurgatoryManager
-                debugLog("Running purgatory cleanup task");
-            })
-            .repeat(5, TimeUnit.MINUTES)
-            .schedule();
-    }
-      public boolean reloadConfig() {
+    @SuppressWarnings("UnnecessaryTemporary")  
+    public boolean reloadConfig() {
         try {
             config = loadConfig();
-            
-            // Refresh debug mode
-            if (config.containsKey("debug")) {
-                debugEnabled = Boolean.parseBoolean(config.get("debug").toString());
+              // Refresh debug mode
+            if (config.containsKey("debug")) {                String debugValueStr = (String) config.get("debug");
+                debugEnabled = Boolean.parseBoolean(debugValueStr);
                 logger.info("Debug mode is now {}", debugEnabled ? "enabled" : "disabled");
             }
             
             // Refresh session timeout
             if (config.containsKey("session.timeout.minutes")) {
-                sessionTimeoutMinutes = Integer.parseInt(config.get("session.timeout.minutes").toString());
+                sessionTimeoutMinutes = Integer.parseInt((String) config.get("session.timeout.minutes"));
                 logger.info("Verification session timeout set to {} minutes", sessionTimeoutMinutes);
             }
             
@@ -319,9 +305,8 @@ public class VelocityDiscordWhitelist {
             // Refresh rewards handler data
             rewardsHandler.loadRankDefinitions();
             
-            return true;
-        } catch (Exception e) {
-            logger.error("Error reloading configuration", e);
+            return true;        } catch (NumberFormatException e) {
+            logger.error("Error parsing configuration values", e);
             return false;
         }
     }    /**
@@ -351,10 +336,10 @@ public class VelocityDiscordWhitelist {
             logger.error("Error saving default configuration", e);
         }
     }    /**
-     * loadConfig
-     * Loads the configuration from the YAML file and sets up default values.
+     * loadConfig     * Loads the configuration from the YAML file and sets up default values.
      * @return Map containing the loaded configuration settings.
      */
+    @SuppressWarnings("UnnecessaryTemporary")
     private Map<String, Object> loadConfig() {
         try {
             Path yamlConfigFile = dataDirectory.resolve("config.yaml");
@@ -365,13 +350,12 @@ public class VelocityDiscordWhitelist {
                 saveDefaultConfig();
                 configLoader = new YamlConfigLoader(logger, dataDirectory);
                 config = configLoader.loadConfig("config");
-            }
-            
+            }            
             // Parse debug setting properly
             @SuppressWarnings("unchecked")
             Map<String, Object> generalConfig = (Map<String, Object>) config.getOrDefault("general", new HashMap<>());
-            String debugValue = (String) generalConfig.getOrDefault("debug", "false");
-            debugEnabled = Boolean.parseBoolean(debugValue);
+            String debugValueStr = (String) generalConfig.getOrDefault("debug", "false");
+            debugEnabled = Boolean.parseBoolean(debugValueStr);
             
             // Initialize JSON config loader
             jsonConfigLoader = new JsonConfigLoader(logger, dataDirectory);
@@ -384,33 +368,7 @@ public class VelocityDiscordWhitelist {
             return config;
         } catch (RuntimeException e) {
             logger.error("Error loading configuration", e);
-            return new HashMap<>();
-        }
-    }    @SuppressWarnings("unchecked")
-    private void initializeIntegrations() {
-        // Initialize LuckPerms integration
-        luckPermsIntegration = new LuckPermsIntegration(logger, debugEnabled, config);
-        if (luckPermsIntegration.isAvailable()) {
-            logger.info("LuckPerms integration enabled");
-        } else {
-            debugLog("LuckPerms integration not available or disabled");
-        }
-        
-        // Initialize Vault integration
-        vaultIntegration = new VaultIntegration(server, logger, debugEnabled, config);
-        Map<String, Object> vaultConfig = (Map<String, Object>) config.getOrDefault("vault", Map.of());
-        boolean vaultEnabled = Boolean.parseBoolean(vaultConfig.getOrDefault("enabled", "false").toString());
-        
-        if (vaultEnabled) {
-            if (vaultIntegration.isEconomyAvailable() || vaultIntegration.isPermissionsAvailable()) {
-                logger.info("Vault integration enabled - Economy: {}, Permissions: {}", 
-                    vaultIntegration.isEconomyAvailable(), vaultIntegration.isPermissionsAvailable());
-            } else {
-                debugLog("Vault integration configured but target server not available");
-            }
-        } else {
-            debugLog("Vault integration disabled in configuration");
-        }
+            return new HashMap<>();        }
     }// Getters for components
     
     public SQLHandler getSqlHandler() {

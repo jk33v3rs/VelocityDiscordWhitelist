@@ -3,7 +3,7 @@ This is a Velocity Proxy plugin for managing a Minecraft whitelist using MySQL/M
 
 This is NOT a ban manager, it is a whitelist plugin ONLY. 
 The flow for this plugin is:
-- Player attempts to connect with sever details - player is kicked and told they arent whitelisted and to check Discord. This acts as the first layer of proection by tying access to the network to at a minimum, knowing what to google search to find us. 
+- Player attempts to connect with sever details - player is kicked and told they arent whitelisted and to check Discord. This acts as the first layer of protection by tying access to the network to at a minimum, knowing what to google search to find us. 
 - (outside scope) Player joins Discord, completes Onboarding flow as appropriate.
 - (outside scope) player is instructed by some means to begin the whitelist process.
 - in a specific channel or channels nominated in config.yml, player enters /mc <minecraft username> to begin the process.
@@ -26,7 +26,7 @@ The flow for this plugin is:
     - The name of the function
     - The purpose of the function
     - All parameters and notes on their use
-    - The return value, if applicable and notes on it's use
+    - The return value, if applicable and notes on its use
 
 ## Error Handling
 - Always handle potential errors gracefully.

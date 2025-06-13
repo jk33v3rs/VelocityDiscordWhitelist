@@ -15,6 +15,7 @@ import top.jk33v3rs.velocitydiscordwhitelist.database.SQLHandler;
 import top.jk33v3rs.velocitydiscordwhitelist.models.BlazeAndCavesAdvancement;
 import top.jk33v3rs.velocitydiscordwhitelist.models.XPEvent;
 import top.jk33v3rs.velocitydiscordwhitelist.utils.LoggingUtils;
+import top.jk33v3rs.velocitydiscordwhitelist.utils.ExceptionHandler;
 
 /**
  * XPManager handles XP operations with rate limiting to prevent XP farming.
@@ -24,6 +25,7 @@ public class XPManager {
     private final SQLHandler sqlHandler;
     private final Logger logger;
     private final boolean debugEnabled;
+    private final ExceptionHandler exceptionHandler;
     
     // Rate limiting maps
     private final Map<String, Instant> lastEventTime;
@@ -74,6 +76,7 @@ public class XPManager {
         this.sqlHandler = sqlHandler;
         this.logger = logger;
         this.debugEnabled = debugEnabled;
+        this.exceptionHandler = new ExceptionHandler(logger, debugEnabled);
         
         // Initialize collections
         this.lastEventTime = new ConcurrentHashMap<>();
@@ -130,11 +133,10 @@ public class XPManager {
      * @param serverName The server where the event occurred
      * @param metadata Additional metadata about the event
      * @return CompletableFuture that resolves to true if XP was granted, false if rate limited
-     */
-    public CompletableFuture<Boolean> processXPGain(String playerUuid, String eventType, String eventSource, 
+     */    public CompletableFuture<Boolean> processXPGain(String playerUuid, String eventType, String eventSource, 
                                                    int baseXP, String serverName, String metadata) {
         return CompletableFuture.supplyAsync(() -> {
-            try {
+            return exceptionHandler.executeWithHandling("processing XP gain for player " + playerUuid, () -> {
                 // Check rate limiting first
                 if (rateLimitingEnabled && !passesRateLimiting(playerUuid, eventType, eventSource)) {
                     LoggingUtils.debugLog(logger, debugEnabled, "XP gain rate limited for player " + playerUuid + " - " + eventType + ":" + eventSource);
@@ -156,14 +158,7 @@ public class XPManager {
                 
                 LoggingUtils.debugLog(logger, debugEnabled, "XP granted: " + finalXP + " to player " + playerUuid + " for " + eventType + ":" + eventSource);
                 return true;
-                
-            } catch (IllegalArgumentException e) {
-                logger.error("Invalid argument processing XP gain for player " + playerUuid + ": " + e.getMessage(), e);
-                return false;
-            } catch (Exception e) {
-                logger.error("Unexpected error processing XP gain for player " + playerUuid, e);
-                return false;
-            }
+            }, false);
         });
     }
     
@@ -174,8 +169,7 @@ public class XPManager {
      * @param eventType The type of event
      * @param eventSource The specific source of the event
      * @return True if the event passes rate limiting, false otherwise
-     */
-    private boolean passesRateLimiting(String playerUuid, String eventType, String eventSource) {
+     */    private boolean passesRateLimiting(String playerUuid, String eventType, String eventSource) {
         String rateLimitKey = playerUuid + ":" + eventType + ":" + eventSource;
         Instant now = Instant.now();
         
@@ -187,48 +181,38 @@ public class XPManager {
                 debugLog("Rate limit: Cooldown not met for " + rateLimitKey + " (" + secondsSinceLastEvent + "s < " + cooldownSeconds + "s)");
                 return false;
             }
-        }
-        
-        // Check database for recent events (more comprehensive check)
-        try {
-            // Check events in the last minute
-            int eventsLastMinute = sqlHandler.getXPEventCount(playerUuid, eventType, eventSource, 
-                                                            now.minus(1, ChronoUnit.MINUTES), now);
-            if (eventsLastMinute >= maxEventsPerMinute) {
-                debugLog("Rate limit: Too many events in last minute for " + rateLimitKey + " (" + eventsLastMinute + " >= " + maxEventsPerMinute + ")");
-                return false;
+        }        // Check database for recent events (more comprehensive check)
+        return exceptionHandler.executeWithHandling("checking rate limiting for " + rateLimitKey, () -> {
+            try {
+                // Check events in the last minute
+                int eventsLastMinute = sqlHandler.getXPEventCount(playerUuid, eventType, eventSource, 
+                                                                now.minus(1, ChronoUnit.MINUTES), now);
+                if (eventsLastMinute >= maxEventsPerMinute) {
+                    debugLog("Rate limit: Too many events in last minute for " + rateLimitKey + " (" + eventsLastMinute + " >= " + maxEventsPerMinute + ")");
+                    return false;
+                }
+                
+                // Check events in the last hour
+                int eventsLastHour = sqlHandler.getXPEventCount(playerUuid, eventType, eventSource, 
+                                                               now.minus(1, ChronoUnit.HOURS), now);
+                if (eventsLastHour >= maxEventsPerHour) {
+                    debugLog("Rate limit: Too many events in last hour for " + rateLimitKey + " (" + eventsLastHour + " >= " + maxEventsPerHour + ")");
+                    return false;
+                }
+                
+                // Check events in the last day
+                int eventsLastDay = sqlHandler.getXPEventCount(playerUuid, eventType, eventSource, 
+                                                              now.minus(1, ChronoUnit.DAYS), now);
+                if (eventsLastDay >= maxEventsPerDay) {
+                    debugLog("Rate limit: Too many events in last day for " + rateLimitKey + " (" + eventsLastDay + " >= " + maxEventsPerDay + ")");
+                    return false;
+                }
+                
+                return true;
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
             }
-            
-            // Check events in the last hour
-            int eventsLastHour = sqlHandler.getXPEventCount(playerUuid, eventType, eventSource, 
-                                                           now.minus(1, ChronoUnit.HOURS), now);
-            if (eventsLastHour >= maxEventsPerHour) {
-                debugLog("Rate limit: Too many events in last hour for " + rateLimitKey + " (" + eventsLastHour + " >= " + maxEventsPerHour + ")");
-                return false;
-            }
-            
-            // Check events in the last day
-            int eventsLastDay = sqlHandler.getXPEventCount(playerUuid, eventType, eventSource, 
-                                                          now.minus(1, ChronoUnit.DAYS), now);
-            if (eventsLastDay >= maxEventsPerDay) {
-                debugLog("Rate limit: Too many events in last day for " + rateLimitKey + " (" + eventsLastDay + " >= " + maxEventsPerDay + ")");
-                return false;
-            }
-        } catch (SQLException e) {
-            logger.error("Database error checking rate limiting for " + rateLimitKey + ": " + e.getMessage(), e);
-            // Allow the event if we can't check the database due to SQL issues
-            return true;
-        } catch (IllegalArgumentException e) {
-            logger.error("Invalid argument checking rate limiting for " + rateLimitKey + ": " + e.getMessage(), e);
-            // Allow the event if we can't check the database
-            return true;
-        } catch (Exception e) {
-            logger.error("Unexpected error checking rate limiting for " + rateLimitKey, e);
-            // Allow the event if we can't check the database
-            return true;
-        }
-        
-        return true;
+        }, true); // Default to allowing the event if we can't check the database
     }
     
     /**
@@ -266,21 +250,22 @@ public class XPManager {
         
         return Math.max(1, (int) Math.round(baseXP * modifier));
     }
-    
-    /**
+      /**
      * Records an XP event to the database
      * 
      * @param xpEvent The XP event to record
      */
     private void recordXPEvent(XPEvent xpEvent) {
-        try {
-            sqlHandler.recordXPEvent(xpEvent.getPlayerUuid(), xpEvent.getEventType(), 
-                                   xpEvent.getEventSource(), xpEvent.getXpGained(), 
-                                   xpEvent.getTimestamp(), xpEvent.getServerName(), 
-                                   xpEvent.getMetadata());
-        } catch (SQLException e) {
-            logger.error("Error recording XP event", e);
-        }
+        exceptionHandler.executeWithHandling("recording XP event", () -> {
+            try {
+                sqlHandler.recordXPEvent(xpEvent.getPlayerUuid(), xpEvent.getEventType(), 
+                                       xpEvent.getEventSource(), xpEvent.getXpGained(), 
+                                       xpEvent.getTimestamp(), xpEvent.getServerName(), 
+                                       xpEvent.getMetadata());
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        });
     }
     
     /**
@@ -339,89 +324,88 @@ public class XPManager {
                                        "hardcore", 40, false, true, "hard", "Survive nights in hardcore"));
         
         debugLog("Initialized " + blazeAndCavesMap.size() + " BlazeAndCaves advancement mappings");
-    }
-    
-    /**
+    }    /**
      * Gets recent XP events for a player
      * 
      * @param playerUuid The UUID of the player
      * @param limit Maximum number of events to retrieve
      * @return CompletableFuture that resolves to a List of XPEvent objects
      */
-    public CompletableFuture<List<XPEvent>> getRecentXPEvents(String playerUuid, int limit) {
-        return CompletableFuture.supplyAsync(() -> {            try {
-                return sqlHandler.getRecentXPEvents(playerUuid, limit);
-            } catch (Exception e) {
-                logger.error("Error getting recent XP events for player " + playerUuid + ": " + e.getMessage(), e);
-                return new ArrayList<>();
-            }
-        });
-    }
-    
-    /**
+    public CompletableFuture<List<XPEvent>> getRecentXPEvents(String playerUuid, int limit) {        return exceptionHandler.wrapAsync(
+            "getting recent XP events for player " + playerUuid,
+            () -> CompletableFuture.supplyAsync(() -> {
+                try {
+                    return sqlHandler.getRecentXPEvents(playerUuid, limit);
+                } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                }
+            }),
+            new ArrayList<>()
+        );
+    }      /**
      * Gets XP statistics for a player
      * 
      * @param playerUuid The UUID of the player
      * @param days Number of days to look back for statistics
      * @return CompletableFuture that resolves to a Map containing XP statistics
-     */
-    public CompletableFuture<Map<String, Object>> getXPStatistics(String playerUuid, int days) {
-        return CompletableFuture.supplyAsync(() -> {            try {
-                Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
-                int totalXP = sqlHandler.getPlayerXPSince(playerUuid, since);
-                Map<String, Integer> xpBySource = sqlHandler.getPlayerXPBySource(playerUuid, since);
-                Map<String, Integer> dailyXP = sqlHandler.getDailyXPBreakdown(playerUuid, days);
-                
-                Map<String, Object> statistics = new ConcurrentHashMap<>();
-                statistics.put("totalXP", totalXP);
-                statistics.put("xpBySource", xpBySource);
-                statistics.put("dailyXP", dailyXP);
-                statistics.put("days", days);
-                statistics.put("since", since.toString());
-                
-                return statistics;
-            } catch (Exception e) {
-                logger.error("Error getting XP statistics for player " + playerUuid + ": " + e.getMessage(), e);
-                return new ConcurrentHashMap<String, Object>();
-            }
-        });
+     */    public CompletableFuture<Map<String, Object>> getXPStatistics(String playerUuid, int days) {
+        return exceptionHandler.wrapAsync(
+            "getting XP statistics for player " + playerUuid,
+            () -> CompletableFuture.supplyAsync(() -> {
+                try {
+                    Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
+                    int totalXP = sqlHandler.getPlayerXPSince(playerUuid, since); // This throws SQLException
+                    Map<String, Integer> xpBySource = sqlHandler.getPlayerXPBySource(playerUuid, since); // This does NOT throw SQLException
+                    Map<String, Integer> dailyXP = sqlHandler.getDailyXPBreakdown(playerUuid, days); // This does NOT throw SQLException
+                    
+                    Map<String, Object> statistics = new ConcurrentHashMap<>();
+                    statistics.put("totalXP", totalXP);
+                    statistics.put("xpBySource", xpBySource);
+                    statistics.put("dailyXP", dailyXP);
+                    statistics.put("days", days);
+                    statistics.put("since", since.toString());
+                    
+                    return statistics;
+                } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                }
+            }),
+            new ConcurrentHashMap<>()
+        );
     }
-    
-    /**
+      /**
      * Gets XP for a player since a specific time
      * 
      * @param playerUuid The UUID of the player
      * @param since The timestamp to look back from
      * @return CompletableFuture that resolves to the total XP amount since the given time
-     */
-    public CompletableFuture<Integer> getPlayerXPSince(String playerUuid, Instant since) {
-        return CompletableFuture.supplyAsync(() -> {            try {
-                return sqlHandler.getPlayerXPSince(playerUuid, since);
-            } catch (Exception e) {
-                logger.error("Error getting XP since " + since + " for player " + playerUuid + ": " + e.getMessage(), e);
-                return 0;
-            }
-        });
-    }
-
-    /**
+     */    public CompletableFuture<Integer> getPlayerXPSince(String playerUuid, Instant since) {
+        return exceptionHandler.wrapAsync(
+            "getting XP since " + since + " for player " + playerUuid,
+            () -> CompletableFuture.supplyAsync(() -> {
+                try {
+                    return sqlHandler.getPlayerXPSince(playerUuid, since);
+                } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                }
+            }),
+            0
+        );
+    }/**
      * Gets XP breakdown by source for a player since a specific time
      * 
      * @param playerUuid The UUID of the player
      * @param since The timestamp to look back from
      * @return CompletableFuture that resolves to a Map of source to XP amount
-     */
-    public CompletableFuture<Map<String, Integer>> getPlayerXPBySource(String playerUuid, Instant since) {
-        return CompletableFuture.supplyAsync(() -> {            try {
+     */    public CompletableFuture<Map<String, Integer>> getPlayerXPBySource(String playerUuid, Instant since) {
+        return exceptionHandler.wrapAsync(
+            "getting XP by source for player " + playerUuid,
+            () -> CompletableFuture.supplyAsync(() -> {
                 return sqlHandler.getPlayerXPBySource(playerUuid, since);
-            } catch (Exception e) {
-                logger.error("Error getting XP by source for player " + playerUuid + ": " + e.getMessage(), e);
-                return new ConcurrentHashMap<String, Integer>();
-            }
-        });
-    }
-
-    /**
+            }),
+            new ConcurrentHashMap<>()
+        );
+    }/**
      * Gets daily XP breakdown for a player
      * 
      * @param playerUuid The UUID of the player
@@ -429,15 +413,15 @@ public class XPManager {
      * @return CompletableFuture that resolves to a Map of date string to XP amount
      */
     public CompletableFuture<Map<String, Integer>> getDailyXPBreakdown(String playerUuid, int days) {
-        return CompletableFuture.supplyAsync(() -> {            try {
+        return exceptionHandler.wrapAsync(
+            "getting daily XP breakdown for player " + playerUuid,
+            () -> CompletableFuture.supplyAsync(() -> {
                 return sqlHandler.getDailyXPBreakdown(playerUuid, days);
-            } catch (Exception e) {
-                logger.error("Error getting daily XP breakdown for player " + playerUuid + ": " + e.getMessage(), e);
-                return new ConcurrentHashMap<String, Integer>();
-            }
-        });    }
-    
-    /**
+            }),
+            new ConcurrentHashMap<>()
+        );
+    }
+      /**
      * getPlayerTotalXP
      * 
      * Retrieves the total XP accumulated by a player using their UUID string.
@@ -447,24 +431,25 @@ public class XPManager {
      * @return CompletableFuture<Integer> containing the total XP amount, or 0 if player not found
      */
     public CompletableFuture<Integer> getPlayerTotalXP(String playerUuid) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                return sqlHandler.getPlayerTotalXP(playerUuid);
-            } catch (Exception e) {
-                logger.error("Error getting total XP for player " + playerUuid + ": " + e.getMessage(), e);
-                return 0;
-            }
-        });
-    }
-    
-    /**
+        return exceptionHandler.wrapAsync(
+            "getting total XP for player " + playerUuid,
+            () -> CompletableFuture.supplyAsync(() -> {
+                try {
+                    return sqlHandler.getPlayerTotalXP(playerUuid);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }),
+            0
+        );
+    }    /**
      * cleanupRateLimitingData
      * 
      * Clears old rate limiting data to prevent memory leaks.
      * Removes entries older than 1 day and resets event counts.
      */
     public void cleanupRateLimitingData() {
-        try {
+        exceptionHandler.executeWithHandling("cleaning up rate limiting data", () -> {
             Instant cutoff = Instant.now().minus(1, ChronoUnit.DAYS);
             lastEventTime.entrySet().removeIf(entry -> entry.getValue().isBefore(cutoff));
             
@@ -472,9 +457,7 @@ public class XPManager {
             eventCounts.clear();
             
             debugLog("Cleaned up rate limiting data");
-        } catch (Exception e) {
-            logger.error("Error cleaning up rate limiting data", e);
-        }
+        });
     }
     
     /**

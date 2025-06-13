@@ -3,6 +3,7 @@ package top.jk33v3rs.velocitydiscordwhitelist.integrations;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
 import org.slf4j.Logger;
+import top.jk33v3rs.velocitydiscordwhitelist.utils.ExceptionHandler;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,9 +20,13 @@ public class VaultIntegration {
     private final boolean economyEnabled;
     private final boolean permissionsEnabled;
     private final String rewardServer;
-
-    /**
+    private final ExceptionHandler exceptionHandler;    /**
      * Constructor for VaultIntegration
+     * 
+     * @param proxyServer The Velocity proxy server instance
+     * @param logger The logger instance for this integration
+     * @param debugEnabled Whether debug logging is enabled
+     * @param config The plugin configuration map
      */
     @SuppressWarnings("unchecked")
     public VaultIntegration(ProxyServer proxyServer, Logger logger, boolean debugEnabled, Map<String, Object> config) {
@@ -29,6 +34,7 @@ public class VaultIntegration {
         this.logger = logger;
         this.debugEnabled = debugEnabled;
         this.config = config;
+        this.exceptionHandler = new ExceptionHandler(logger, debugEnabled);
         
         Map<String, Object> vaultConfig = (Map<String, Object>) config.getOrDefault("vault", Map.of());
         this.economyEnabled = Boolean.parseBoolean(vaultConfig.getOrDefault("economy.enabled", "false").toString());
@@ -64,9 +70,7 @@ public class VaultIntegration {
      */
     private Optional<RegisteredServer> getTargetServer() {
         return proxyServer.getServer(rewardServer);
-    }
-
-    /**
+    }    /**
      * Gives currency reward to a player for whitelisting
      * 
      * @param playerName The name of the player to reward
@@ -82,7 +86,7 @@ public class VaultIntegration {
         }
 
         return CompletableFuture.supplyAsync(() -> {
-            try {
+            return exceptionHandler.executeWithHandling("Economy whitelist reward for " + playerName, () -> {
                 Map<String, Object> vaultConfig = (Map<String, Object>) config.getOrDefault("vault", Map.of());
                 Map<String, Object> economyConfig = (Map<String, Object>) vaultConfig.getOrDefault("economy", Map.of());
                 
@@ -98,15 +102,9 @@ public class VaultIntegration {
                 }
                 
                 return success;
-                
-            } catch (Exception e) {
-                logger.error("Error giving whitelist reward to " + playerName, e);
-                return false;
-            }
+            }, false);
         });
-    }
-
-    /**
+    }    /**
      * Gives currency reward to a player for rank progression
      * 
      * @param playerName The name of the player to reward
@@ -122,7 +120,7 @@ public class VaultIntegration {
         }
 
         return CompletableFuture.supplyAsync(() -> {
-            try {
+            return exceptionHandler.executeWithHandling("Economy rank reward for " + playerName, () -> {
                 Map<String, Object> vaultConfig = (Map<String, Object>) config.getOrDefault("vault", Map.of());
                 Map<String, Object> economyConfig = (Map<String, Object>) vaultConfig.getOrDefault("economy", Map.of());
                 
@@ -146,14 +144,9 @@ public class VaultIntegration {
                 }
                 
                 return success;
-            } catch (Exception e) {
-                logger.error("Error giving rank reward to " + playerName, e);
-                return false;
-            }
+            }, false);
         });
-    }
-
-    /**
+    }    /**
      * Adds a player to a permission group
      * 
      * @param playerName The name of the player
@@ -168,7 +161,7 @@ public class VaultIntegration {
         }
 
         return CompletableFuture.supplyAsync(() -> {
-            try {
+            return exceptionHandler.executeWithHandling("Add player to permission group", () -> {
                 // Send command to backend server to add player to group
                 String command = world != null ? 
                     String.format("lp user %s parent add %s world=%s", playerName, groupName, world) :
@@ -183,14 +176,9 @@ public class VaultIntegration {
                     logger.warn("Failed to add player {} to group {} in world {}", playerName, groupName, world);
                 }
                 return result;
-            } catch (Exception e) {
-                logger.error("Error adding player " + playerName + " to group " + groupName, e);
-                return false;
-            }
+            }, false);
         });
-    }
-
-    /**
+    }    /**
      * Removes a player from a permission group
      * 
      * @param playerName The name of the player
@@ -205,7 +193,7 @@ public class VaultIntegration {
         }
 
         return CompletableFuture.supplyAsync(() -> {
-            try {
+            return exceptionHandler.executeWithHandling("Remove player from permission group", () -> {
                 // Send command to backend server to remove player from group
                 String command = world != null ?
                     String.format("lp user %s parent remove %s world=%s", playerName, groupName, world) :
@@ -220,14 +208,9 @@ public class VaultIntegration {
                     logger.warn("Failed to remove player {} from group {} in world {}", playerName, groupName, world);
                 }
                 return result;
-            } catch (Exception e) {
-                logger.error("Error removing player " + playerName + " from group " + groupName, e);
-                return false;
-            }
+            }, false);
         });
-    }
-
-    /**
+    }    /**
      * Gets the primary group of a player
      * 
      * @param playerName The name of the player
@@ -240,18 +223,13 @@ public class VaultIntegration {
             return Optional.empty();
         }
 
-        try {
+        return exceptionHandler.executeWithHandling("Getting primary group for player " + playerName, () -> {
             // For Velocity proxy, we would need to query this from backend server
             // This is a simplified implementation that returns default group
             debugLog("Primary group lookup not fully implemented for proxy - returning default");
             return Optional.of("default");
-        } catch (Exception e) {
-            logger.error("Error getting primary group for player " + playerName, e);
-            return Optional.empty();
-        }
-    }
-
-    /**
+        }, Optional.empty());
+    }    /**
      * Gets all groups a player belongs to
      * 
      * @param playerName The name of the player
@@ -264,18 +242,13 @@ public class VaultIntegration {
             return new String[0];
         }
 
-        try {
+        return exceptionHandler.executeWithHandling("Getting player groups for " + playerName, () -> {
             // For Velocity proxy, we would need to query this from backend server
             // This is a simplified implementation that returns default group
             debugLog("Player groups lookup not fully implemented for proxy - returning default");
             return new String[]{"default"};
-        } catch (Exception e) {
-            logger.error("Error getting groups for player " + playerName, e);
-            return new String[0];
-        }
-    }
-
-    /**
+        }, new String[0]);
+    }    /**
      * Syncs a player's permission group based on their current rank
      * 
      * @param playerName The name of the player
@@ -290,8 +263,9 @@ public class VaultIntegration {
             return CompletableFuture.completedFuture(false);
         }
 
-        return CompletableFuture.supplyAsync(() -> {
-            try {
+        return exceptionHandler.wrapAsync(
+            "syncing rank groups for player " + playerName,
+            () -> CompletableFuture.supplyAsync(() -> {
                 Map<String, Object> vaultConfig = (Map<String, Object>) config.getOrDefault("vault", Map.of());
                 Map<String, Object> permConfig = (Map<String, Object>) vaultConfig.getOrDefault("permissions", Map.of());
                 
@@ -313,11 +287,9 @@ public class VaultIntegration {
                 }
                 
                 return true;
-            } catch (Exception e) {
-                logger.error("Error syncing rank group for player " + playerName, e);
-                return false;
-            }
-        });
+            }),
+            false
+        );
     }
 
     /**
@@ -370,9 +342,7 @@ public class VaultIntegration {
         if (debugEnabled) {
             logger.info("[VaultIntegration] " + message);
         }
-    }
-
-    /**
+    }    /**
      * Executes a command on the target backend server
      * 
      * @param command The command to execute
@@ -380,7 +350,7 @@ public class VaultIntegration {
      * @return true if command was sent successfully, false otherwise
      */
     private boolean executeServerCommand(String command, String description) {
-        try {
+        return exceptionHandler.executeWithHandling("executing server command", () -> {
             Optional<RegisteredServer> serverOpt = getTargetServer();
             if (!serverOpt.isPresent()) {
                 logger.warn("Target server '{}' not available for command: {}", rewardServer, command);
@@ -400,10 +370,6 @@ public class VaultIntegration {
             // For now, we assume the command succeeds
             logger.info("Sent command to server '{}': {} ({})", rewardServer, command, description);
             return true;
-            
-        } catch (Exception e) {
-            logger.error("Error executing server command: " + command, e);
-            return false;
-        }
+        }, false);
     }
 }

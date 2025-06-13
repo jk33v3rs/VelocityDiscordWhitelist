@@ -1,14 +1,17 @@
 package top.jk33v3rs.velocitydiscordwhitelist.config;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import org.slf4j.Logger;
 import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
-
-import java.io.*;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 /**
  * YamlConfigLoader manages YAML configuration files for the plugin.
@@ -32,12 +35,11 @@ public class YamlConfigLoader {
         options.setPrettyFlow(true);
         this.yaml = new Yaml(options);
     }
-    
-    /**
+      /**
      * Loads or creates a YAML configuration file
      */
     public Map<String, Object> loadConfig(String fileName) {
-        String fullFileName = fileName + ".yml";
+        String fullFileName = fileName + ".yaml";
         Path configPath = dataDirectory.resolve(fullFileName);
         
         // Create data directory if it doesn't exist
@@ -99,10 +101,8 @@ public class YamlConfigLoader {
         discord.put("token", "YOUR_BOT_TOKEN_HERE");
         discord.put("guild_id", "123456789012345678");
         discord.put("verification_channel", "123456789012345678");
-        
-        Map<String, Object> roles = new LinkedHashMap<>();
+          Map<String, Object> roles = new LinkedHashMap<>();
         roles.put("admin", "987654321098765432");
-        roles.put("member", "876543210987654321");
         roles.put("verified", "765432109876543210");
         discord.put("roles", roles);
         
@@ -116,17 +116,21 @@ public class YamlConfigLoader {
         settings.put("allow_reconnect", true);
         settings.put("max_verification_attempts", 3);
         defaultConfig.put("settings", settings);
-        
-        // Session Configuration
+          // Session Configuration
         Map<String, Object> session = new LinkedHashMap<>();
         session.put("timeout", 15);
         defaultConfig.put("session", session);
         
-        // Geyser Integration
+        // Purgatory Configuration
+        Map<String, Object> purgatory = new LinkedHashMap<>();
+        purgatory.put("session_timeout_minutes", 30);
+        defaultConfig.put("purgatory", purgatory);
+          // Geyser Integration
         Map<String, Object> geyser = new LinkedHashMap<>();
         geyser.put("enabled", false);
         geyser.put("handle_bedrock_players", true);
         geyser.put("auto_verify_bedrock", false);
+        geyser.put("prefix", ".");
         defaultConfig.put("geyser", geyser);
         
         // Vault Integration
@@ -143,14 +147,46 @@ public class YamlConfigLoader {
         
         vault.put("reward_server", "survival");
         defaultConfig.put("vault", vault);
-        
-        // LuckPerms Integration
+          // LuckPerms Integration
         Map<String, Object> luckperms = new LinkedHashMap<>();
         luckperms.put("enabled", false);
+        luckperms.put("default_group", "verified");
+        luckperms.put("managed_groups", java.util.Arrays.asList(
+            "bystander", "onlooker", "wanderer", "traveller", "explorer", "verified"
+        ));
+        
+        Map<String, Object> discordRoleMappings = new LinkedHashMap<>();
+        discordRoleMappings.put("discord-role-id-1", "luckperms-group-1");
+        discordRoleMappings.put("discord-role-id-2", "luckperms-group-2");
+        luckperms.put("discord_role_mappings", discordRoleMappings);
+        
+        Map<String, Object> rankMappings = new LinkedHashMap<>();
+        rankMappings.put("1.0", "bystander");
+        rankMappings.put("1.1", "onlooker");
+        rankMappings.put("2.0", "wanderer");
+        rankMappings.put("2.1", "traveller");
+        rankMappings.put("3.0", "explorer");
+        rankMappings.put("3.1", "verified");
+        luckperms.put("rank_mappings", rankMappings);
+        
+        Map<String, Object> discordMappings = new LinkedHashMap<>();
+        discordMappings.put("123456789012345678", "special_group");
+        luckperms.put("discord_mappings", discordMappings);
+        
         defaultConfig.put("luckperms", luckperms);
         
-        // XP System Configuration
+        // Rewards Configuration
+        Map<String, Object> rewards = new LinkedHashMap<>();
+        rewards.put("enabled", true);
+        defaultConfig.put("rewards", rewards);
+        
+        // Ranks Configuration  
+        Map<String, Object> ranks = new LinkedHashMap<>();
+        ranks.put("enabled", true);
+        defaultConfig.put("ranks", ranks);
+          // XP System Configuration
         Map<String, Object> xp = new LinkedHashMap<>();
+        xp.put("enabled", true);
         
         Map<String, Object> rateLimiting = new LinkedHashMap<>();
         rateLimiting.put("enabled", true);
@@ -158,7 +194,7 @@ public class YamlConfigLoader {
         rateLimiting.put("maxEventsPerHour", 100);
         rateLimiting.put("maxEventsPerDay", 500);
         rateLimiting.put("cooldownSeconds", 5);
-        xp.put("rateLimiting", rateLimiting);
+        xp.put("rate_limiting", rateLimiting);
         
         Map<String, Object> modifiers = new LinkedHashMap<>();
         modifiers.put("advancement", 1.0);
@@ -172,26 +208,16 @@ public class YamlConfigLoader {
         modifiers.put("fishing", 0.4);
         modifiers.put("mining", 0.3);
         xp.put("modifiers", modifiers);
-        
-        Map<String, Object> blazeAndCaves = new LinkedHashMap<>();
+          Map<String, Object> blazeAndCaves = new LinkedHashMap<>();
         blazeAndCaves.put("enabled", true);
+        blazeAndCaves.put("easy_multiplier", 1.0);
+        blazeAndCaves.put("medium_multiplier", 1.25);
+        blazeAndCaves.put("hard_multiplier", 1.5);
+        blazeAndCaves.put("insane_multiplier", 2.0);
+        blazeAndCaves.put("terralith_bonus", 0.1);
+        blazeAndCaves.put("hardcore_bonus", 0.5);
         
-        Map<String, Object> difficultyMultipliers = new LinkedHashMap<>();
-        difficultyMultipliers.put("easy", 1.0);
-        difficultyMultipliers.put("medium", 1.25);
-        difficultyMultipliers.put("hard", 1.5);
-        difficultyMultipliers.put("insane", 2.0);
-        blazeAndCaves.put("difficultyMultipliers", difficultyMultipliers);
-        
-        Map<String, Object> variantBonuses = new LinkedHashMap<>();
-        variantBonuses.put("terralith", 0.1);
-        variantBonuses.put("hardcore", 0.5);
-        blazeAndCaves.put("variantBonuses", variantBonuses);
-        
-        // Empty advancement mappings - will be populated with defaults if not configured
-        blazeAndCaves.put("advancements", new LinkedHashMap<>());
-        
-        xp.put("blazeAndCaves", blazeAndCaves);
+        xp.put("blaze_and_caves", blazeAndCaves);
         defaultConfig.put("xp", xp);
         
         // Message configuration
@@ -223,11 +249,10 @@ public class YamlConfigLoader {
             yaml.dump(defaultConfig, writer);
         }
     }
-    
-    /**
+      /**
      * Gets a configuration value from the loaded config
      * 
-     * @param fileName The name of the config file (without .yml extension)
+     * @param fileName The name of the config file (without .yaml extension)
      * @param path The path to the value, using dot notation (e.g., "database.host")
      * @param defaultValue The default value to return if the path doesn't exist
      * @return The configuration value, or the default value if not found
@@ -258,11 +283,10 @@ public class YamlConfigLoader {
             return defaultValue;
         }
     }
-    
-    /**
+      /**
      * Gets the database configuration section
      * 
-     * @param fileName The name of the config file (without .yml extension)
+     * @param fileName The name of the config file (without .yaml extension)
      * @return A map containing the database configuration
      */
     /**
@@ -270,7 +294,7 @@ public class YamlConfigLoader {
      * 
      * Retrieves the database configuration section from the loaded config.
      * 
-     * @param fileName The name of the config file (without .yml extension)
+     * @param fileName The name of the config file (without .yaml extension)
      * @return A map containing the database configuration, or an empty map if not found
      */
     public Map<String, Object> getDatabaseConfig(String fileName) {

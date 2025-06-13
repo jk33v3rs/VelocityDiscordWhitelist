@@ -52,8 +52,7 @@ public class ExceptionHandler {
                 "Database operation timed out during " + operation,
                 true // retryable
             );
-        } else if (exception instanceof SQLException) {
-            SQLException sqlEx = (SQLException) exception;
+        } else if (exception instanceof SQLException sqlEx) {
             LoggingUtils.logDatabaseError(logger, operation, exception);
             
             if (debugEnabled) {
@@ -77,12 +76,13 @@ public class ExceptionHandler {
             } else {
                 return new DatabaseErrorResult(
                     DatabaseErrorType.GENERAL_SQL_ERROR,
-                    "SQL error during " + operation + ": " + sqlEx.getMessage(),
+                    "SQL error during " + operation + ": " + (sqlEx.getMessage() != null ? sqlEx.getMessage() : "Unknown SQL error"),
                     false
                 );
             }
         } else {
-            logger.error("Unexpected database error during {}: {}", operation, exception.getMessage(), exception);
+            String errorMessage = exception != null && exception.getMessage() != null ? exception.getMessage() : "Unknown database error";
+            logger.error("Unexpected database error during {}: {}", operation, errorMessage, exception);
             return new DatabaseErrorResult(
                 DatabaseErrorType.UNEXPECTED_ERROR,
                 "Unexpected error during " + operation,
@@ -94,37 +94,32 @@ public class ExceptionHandler {
     /**
      * Handles Discord API-related exceptions with appropriate user feedback
      * 
-     * @param event The Discord slash command event
+     * @param event The Discord slash command event (can be null)
      * @param operation The operation being performed
      * @param exception The Discord API exception
      */
     public void handleDiscordException(SlashCommandInteractionEvent event, String operation, Throwable exception) {
-        if (exception instanceof ErrorResponseException) {
-            ErrorResponseException discordEx = (ErrorResponseException) exception;
+        if (exception instanceof ErrorResponseException errorResponse) {
             LoggingUtils.logIntegrationError(logger, "Discord API", operation, exception);
             
-            switch (discordEx.getErrorCode()) {
-                case 50013 -> // Missing Permissions
-                    event.getHook().sendMessage("❌ Bot lacks necessary permissions to complete this action.")
-                        .setEphemeral(true).queue();
-                case 50001 -> // Missing Access
-                    event.getHook().sendMessage("❌ Bot cannot access the required Discord resource.")
-                        .setEphemeral(true).queue();
-                case 50035 -> // Invalid Form Body
-                    event.getHook().sendMessage("❌ Invalid command parameters provided.")
-                        .setEphemeral(true).queue();
-                default ->
-                    event.getHook().sendMessage("❌ Discord API error occurred. Please try again later.")
-                        .setEphemeral(true).queue();
+            String userMessage = switch (errorResponse.getErrorCode()) {
+                case 50013 -> "I don't have permission to perform this action. Please check my Discord permissions.";
+                case 50001 -> "I don't have access to this channel or resource.";
+                case 10062 -> "This interaction has expired. Please try the command again.";
+                case 40060 -> "This interaction has already been acknowledged.";
+                default -> "A Discord API error occurred. Please try again later.";
+            };
+            
+            if (event != null && !event.isAcknowledged()) {
+                try {
+                    event.reply(userMessage).setEphemeral(true).queue();
+                } catch (Exception replyException) {
+                    logger.warn("Failed to send error reply to Discord", replyException);
+                }
             }
-        } else if (exception instanceof IllegalArgumentException) {
-            logger.warn("Invalid argument for Discord operation {}: {}", operation, exception.getMessage());
-            event.getHook().sendMessage("❌ Invalid parameters provided: " + exception.getMessage())
-                .setEphemeral(true).queue();
         } else {
-            logger.error("Unexpected error during Discord operation {}: {}", operation, exception.getMessage(), exception);
-            event.getHook().sendMessage("❌ An unexpected error occurred. Please contact an administrator.")
-                .setEphemeral(true).queue();
+            String errorMessage = exception != null && exception.getMessage() != null ? exception.getMessage() : "Unknown Discord error";
+            logger.error("Unexpected error during Discord operation {}: {}", operation, errorMessage, exception);
         }
     }
     
@@ -134,20 +129,76 @@ public class ExceptionHandler {
      * @param player The player involved in the operation (can be null)
      * @param operation The operation being performed
      * @param exception The exception that occurred
+     * @param playerInfo Additional context about the player
+     */
+    public void handlePlayerException(Player player, String operation, Throwable exception, String playerInfo) {
+        String errorMessage = exception != null && exception.getMessage() != null ? exception.getMessage() : "Unknown player operation error";
+        logger.error("Error during player operation {} with {}: {}", operation, playerInfo, errorMessage, exception);
+        
+        if (player != null && player.isActive()) {
+            // Send appropriate message to player based on exception type
+            // This would be implemented based on your plugin's messaging system
+        }
+    }
+    
+    /**
+     * Handles integration-related exceptions with appropriate logging
+     * 
+     * @param integration The integration name (e.g., "LuckPerms", "Vault")
+     * @param operation The operation that was being performed when the exception occurred
+     * @param exception The exception that occurred
      * @return A user-friendly error message
      */
-    public String handlePlayerException(Player player, String operation, Throwable exception) {
-        String playerInfo = player != null ? player.getUsername() + " (" + player.getUniqueId() + ")" : "unknown player";
+    public String handleIntegrationException(String integration, String operation, Throwable exception) {
+        LoggingUtils.logIntegrationError(logger, integration, operation, exception);
         
-        if (exception instanceof IllegalArgumentException) {
-            logger.warn("Invalid argument for player operation {} with {}: {}", operation, playerInfo, exception.getMessage());
-            return "Invalid operation parameters. Please check your input.";
+        if (exception instanceof ClassNotFoundException) {
+            LoggingUtils.debugLog(logger, debugEnabled, integration + " classes not found - integration not available");
+            return integration + " integration is not available";
+        } else if (exception instanceof IllegalArgumentException) {
+            return "Invalid parameters provided to " + integration + " integration";
         } else if (exception instanceof IllegalStateException) {
-            logger.warn("Invalid state for player operation {} with {}: {}", operation, playerInfo, exception.getMessage());
-            return "Operation cannot be completed in the current state.";
+            return integration + " integration is not in a valid state";
         } else {
-            logger.error("Error during player operation {} with {}: {}", operation, playerInfo, exception.getMessage(), exception);
-            return "An error occurred while processing your request. Please try again or contact an administrator.";
+            return integration + " integration error occurred";
+        }
+    }
+    
+    /**
+     * Executes an operation with automatic exception handling
+     * 
+     * @param operation Description of the operation
+     * @param task The task to execute
+     * @return True if the operation succeeded, false otherwise
+     */
+    public boolean executeWithHandling(String operation, Runnable task) {
+        try {
+            task.run();
+            return true;
+        } catch (Exception e) {
+            logger.error("Operation failed: {}", operation, e);
+            return false;
+        }
+    }
+    
+    /**
+     * Executes an async operation with automatic exception handling
+     * 
+     * @param operation Description of the operation
+     * @param task The async task to execute
+     * @return CompletableFuture that handles exceptions appropriately
+     */
+    public <T> CompletableFuture<T> executeAsyncWithHandling(String operation, Supplier<CompletableFuture<T>> task) {
+        try {
+            return task.get().exceptionally(throwable -> {
+                Throwable actualException = throwable instanceof CompletionException ? throwable.getCause() : throwable;
+                String errorMessage = actualException != null && actualException.getMessage() != null ? actualException.getMessage() : "Unknown async error";
+                logger.error("Async operation failed - {}: {}", operation, errorMessage, actualException);
+                return null;
+            });
+        } catch (Exception e) {
+            logger.error("Failed to start async operation: {}", operation, e);
+            return CompletableFuture.completedFuture(null);
         }
     }
     
@@ -166,11 +217,14 @@ public class ExceptionHandler {
                     Throwable actualException = throwable instanceof CompletionException ? 
                         throwable.getCause() : throwable;
                     
-                    logger.error("Async operation failed - {}: {}", operation, actualException.getMessage(), actualException);
+                    String errorMessage = actualException != null && actualException.getMessage() != null ? 
+                        actualException.getMessage() : "Unknown async error";
+                    logger.error("Async operation failed - {}: {}", operation, errorMessage, actualException);
                     return defaultValue;
                 });
         } catch (Exception e) {
-            logger.error("Failed to start async operation - {}: {}", operation, e.getMessage(), e);
+            String errorMessage = e.getMessage() != null ? e.getMessage() : "Unknown error";
+            logger.error("Failed to start async operation - {}: {}", operation, errorMessage, e);
             return CompletableFuture.completedFuture(defaultValue);
         }
     }
@@ -187,25 +241,9 @@ public class ExceptionHandler {
         try {
             return task.get();
         } catch (Exception e) {
-            logger.error("Operation failed - {}: {}", operation, e.getMessage(), e);
+            String errorMessage = e.getMessage() != null ? e.getMessage() : "Unknown error";
+            logger.error("Operation failed - {}: {}", operation, errorMessage, e);
             return defaultValue;
-        }
-    }
-    
-    /**
-     * Executes an operation that doesn't return a value with automatic exception handling
-     * 
-     * @param operation The operation description for logging
-     * @param task The task to execute
-     * @return True if the operation succeeded, false otherwise
-     */
-    public boolean executeWithHandling(String operation, Runnable task) {
-        try {
-            task.run();
-            return true;
-        } catch (Exception e) {
-            logger.error("Operation failed - {}: {}", operation, e.getMessage(), e);
-            return false;
         }
     }
     
@@ -240,6 +278,17 @@ public class ExceptionHandler {
     }
     
     /**
+     * Enumeration of database error types
+     */
+    public enum DatabaseErrorType {
+        TIMEOUT,
+        CONNECTION_FAILED,
+        CONSTRAINT_VIOLATION,
+        GENERAL_SQL_ERROR,
+        UNEXPECTED_ERROR
+    }
+    
+    /**
      * Represents the result of database error handling
      */
     public static class DatabaseErrorResult {
@@ -256,16 +305,5 @@ public class ExceptionHandler {
         public DatabaseErrorType getErrorType() { return errorType; }
         public String getMessage() { return message; }
         public boolean isRetryable() { return retryable; }
-    }
-    
-    /**
-     * Enumeration of database error types
-     */
-    public enum DatabaseErrorType {
-        TIMEOUT,
-        CONNECTION_FAILED,
-        CONSTRAINT_VIOLATION,
-        GENERAL_SQL_ERROR,
-        UNEXPECTED_ERROR
     }
 }

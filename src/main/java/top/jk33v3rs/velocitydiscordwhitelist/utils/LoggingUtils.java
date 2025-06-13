@@ -3,8 +3,6 @@
 package top.jk33v3rs.velocitydiscordwhitelist.utils;
 
 import org.slf4j.Logger;
-import java.sql.SQLException;
-import net.dv8tion.jda.api.exceptions.ErrorResponseException;
 
 /**
  * Centralized logging utility for the VelocityDiscordWhitelist plugin.

@@ -1,49 +1,57 @@
 # VelocityDiscordWhitelist Configuration v1.0.3
+# Full configuration file based on actual plugin implementation
 
 # Database Configuration
 database:
   host: "localhost"
   port: 3306
-  database: "whitelist"
+  database: "discord_whitelist"
+  table: "whitelist"
   username: "root"
   password: "password"
-  pool:
-    maximum-pool-size: 10
-    minimum-idle: 5
-    connection-timeout: 30000
 
-# Discord Bot Configuration (set enabled: false to disable Discord integration)
+# Discord Bot Configuration
 discord:
-  enabled: true
-  token: "your-bot-token-here"
-  guild-id: "your-guild-id-here"
-  channel-id: "your-channel-id-here"
+  token: "YOUR_BOT_TOKEN_HERE"
+  guild_id: "123456789012345678"
+  verification_channel: "123456789012345678"
+  init_timeout: 30
   roles:
-    whitelisted: "your-whitelisted-role-id"
-    admin: "your-admin-role-id"
+    # Admin role - users with this role have admin privileges
+    admin: "987654321098765432"
+    # Verified role - users with this role are considered verified members and can join the server
+    # Users WITHOUT this role are denied access unless they have an active purgatory session
+    verified: "765432109876543210"
 
 # Plugin Settings
 settings:
   debug: false
-  kick-non-whitelisted: true
-  purgatory-enabled: true
-  purgatory-cleanup-minutes: 5
+  use_purgatory: true
+  purgatory_server: "lobby"
+  allow_reconnect: true
+  max_verification_attempts: 3
+
+# Purgatory Configuration
+purgatory:
+  session_timeout_minutes: 30
 
 # Session Configuration
 session:
-  timeout:
-    minutes: 30
+  timeout: 15
 
 # Geyser Integration (for Bedrock Edition support)
 geyser:
   enabled: false
-  server: "bedrock"
+  handle_bedrock_players: true
+  auto_verify_bedrock: false
+  prefix: "."
 
 # Vault Integration (Economy and Permissions)
 vault:
   economy:
     enabled: false
-    whitelist_reward: 1000
+    whitelist_reward: 100.0
+    rank_progression_reward: 50.0
     rank_base_reward: 500
     subrank_multiplier: 0.5
     mainrank_multiplier: 2.0
@@ -65,11 +73,28 @@ luckperms:
   discord_role_mappings:
     "discord-role-id-1": "luckperms-group-1"
     "discord-role-id-2": "luckperms-group-2"
+  rank_mappings:
+    "1.0": "bystander"
+    "1.1": "onlooker"
+    "2.0": "wanderer"
+    "2.1": "traveller"
+    "3.0": "explorer"
+    "3.1": "verified"
+  discord_mappings:
+    "123456789012345678": "special_group"
+
+# Rewards Configuration
+rewards:
+  enabled: true
+
+# Ranks Configuration  
+ranks:
+  enabled: true
 
 # XP System Configuration
 xp:
   enabled: true
-  rateLimiting:
+  rate_limiting:
     enabled: true
     maxEventsPerMinute: 10
     maxEventsPerHour: 100
@@ -86,23 +111,37 @@ xp:
     trade: 0.6
     fishing: 0.4
     mining: 0.3
-  blazeAndCaves:
+  blaze_and_caves:
     enabled: true
-    difficultyMultipliers:
-      easy: 1.0
-      medium: 1.25
-      hard: 1.5
-      insane: 2.0
-    variantBonuses:
-      terralith: 0.1
-      hardcore: 0.5
+    easy_multiplier: 1.0
+    medium_multiplier: 1.25
+    hard_multiplier: 1.5
+    insane_multiplier: 2.0
+    terralith_bonus: 0.1
+    hardcore_bonus: 0.5
 
-# Messages
+# Messages Configuration
 messages:
   prefix: "&8[&bWhitelist&8]&r "
-  not-whitelisted: "&cYou are not whitelisted on this server!"
-  no-permission: "&cYou don't have permission to use this command!"
-  whitelist-added: "&aYou have been whitelisted!"
-  whitelist-removed: "&cYou have been removed from the whitelist!"
-  already-whitelisted: "&eYou are already whitelisted!"
-  player-not-found: "&cPlayer not found!"
+  verification_code: "Your verification code is: %code%"
+  verification_success: "Verification successful! Welcome to the server!"
+  verification_failed: "Verification failed. Please try again."
+  session_expired: "Your verification session has expired. Please request a new code."
+  already_verified: "You are already verified on this server."
+  purgatory_message: "You are in purgatory mode. Please verify your Discord account to continue."
+  invalid_code: "Invalid verification code. Please check and try again."
+  max_attempts_exceeded: "Maximum verification attempts exceeded. Please request a new code."
+  discord_link_success: "Your Discord account has been successfully linked!"
+  discord_already_linked: "Your Discord account is already linked to another player."
+  not_whitelisted: "&cYou are not whitelisted on this server!"
+  no_permission: "&cYou don't have permission to use this command!"
+  whitelist_added: "&aYou have been whitelisted!"
+  whitelist_removed: "&cYou have been removed from the whitelist!"
+  already_whitelisted: "&eYou are already whitelisted!"
+  player_not_found: "&cPlayer not found!"
+  discord_user_not_found: "Discord user not found."
+  command_usage: "Usage: %usage%"
+  reload_success: "Configuration reloaded successfully!"
+  reload_failed: "Failed to reload configuration. Check console for errors."
+  database_error: "A database error occurred. Please try again later."
+  permission_denied: "You do not have permission to use this command."

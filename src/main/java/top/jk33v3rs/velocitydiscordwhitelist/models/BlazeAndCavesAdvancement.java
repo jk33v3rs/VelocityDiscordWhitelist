@@ -218,21 +218,11 @@ public class BlazeAndCavesAdvancement {
         double finalXP = baseXP;
         if (difficulty != null) {
             switch (difficulty.toLowerCase()) {
-                case "easy":
-                    finalXP *= easyMultiplier;
-                    break;
-                case "medium":
-                    finalXP *= mediumMultiplier;
-                    break;
-                case "hard":
-                    finalXP *= hardMultiplier;
-                    break;
-                case "insane":
-                    finalXP *= insaneMultiplier;
-                    break;
-                default:
-                    finalXP *= 1.0;
-                    break;
+                case "easy"    -> finalXP *= easyMultiplier;
+                case "medium"  -> finalXP *= mediumMultiplier;
+                case "hard"    -> finalXP *= hardMultiplier;
+                case "insane"  -> finalXP *= insaneMultiplier;
+                default        -> finalXP *= 1.0;
             }
         }
         // Apply variant bonuses

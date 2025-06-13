@@ -67,37 +67,6 @@ public class BrigadierCommandHandler {
             this.registerCommands();
         } catch (RuntimeException e) {
             logger.error("Failed to register commands during initialization", e);
-        /**
-         * createXPChartCommand method
-         * Creates the BrigadierCommand for the /xpchart command.
-         * Allows players to view a chart of XP required for each rank.
-         *
-         * @return The BrigadierCommand instance for /xpchart
-         */
-        private BrigadierCommand createXPChartCommand() {
-            LiteralCommandNode<CommandSource> xpChartNode = BrigadierCommand.literalArgumentBuilder("xpchart")
-                .executes(context -> {
-                    CommandSource source = context.getSource();
-                    try {
-                        // Fetch XP chart from RewardsHandler
-                        var xpChart = rewardsHandler.getXPChart();
-                        if (xpChart == null || xpChart.isEmpty()) {
-                            source.sendMessage(Component.text("No XP chart data available.", NamedTextColor.RED));
-                        } else {
-                            source.sendMessage(Component.text("XP Chart:", NamedTextColor.GOLD));
-                            xpChart.forEach((rank, xp) -> {
-                                source.sendMessage(Component.text(rank + ": " + xp + " XP", NamedTextColor.WHITE));
-                            });
-                        }
-                    } catch (Exception e) {
-                        source.sendMessage(Component.text("Could not retrieve XP chart. Please try again later.", NamedTextColor.RED));
-                        logger.error("Error fetching XP chart", e);
-                    }
-                    return Command.SINGLE_SUCCESS;
-                })
-                .build();
-    
-            return new BrigadierCommand(xpChartNode);
         }
     }
 
@@ -151,6 +120,13 @@ public class BrigadierCommandHandler {
         debugLog("Registered /vwl admin command");
     }
 
+    /**
+     * createVerifyCommand method
+     * Creates the BrigadierCommand for the /verify command.
+     * Allows players to verify their Discord account using a code.
+     *
+     * @return The BrigadierCommand instance for /verify
+     */
     private BrigadierCommand createVerifyCommand() {
         LiteralCommandNode<CommandSource> verifyNode = BrigadierCommand.literalArgumentBuilder("verify")
             .then(BrigadierCommand.requiredArgumentBuilder("code", StringArgumentType.word())
@@ -262,30 +238,65 @@ public class BrigadierCommandHandler {
                 if (source instanceof Player player) {
                     String username = player.getUsername();
                     try {
-                        // Fetch rank and XP info from XPManager and RewardsHandler
-                        int xp = xpManager.getPlayerXP(username);
-                        String rank = rewardsHandler.getPlayerRank(username);
-                        int nextXp = rewardsHandler.getNextRankXP(username);
-
-                        source.sendMessage(Component.text("Your current rank: " + rank, NamedTextColor.AQUA));
-                        source.sendMessage(Component.text("XP: " + xp + (nextXp > xp ? " / " + nextXp : ""), NamedTextColor.GREEN));
-                        if (nextXp > xp) {
-                            source.sendMessage(Component.text("XP needed for next rank: " + (nextXp - xp), NamedTextColor.YELLOW));
-                        } else {
-                            source.sendMessage(Component.text("You have reached the highest rank!", NamedTextColor.GOLD));
-                        }
+                        // Fetch rank and XP info from RewardsHandler
+                        rewardsHandler.getPlayerRank(username).thenAccept(playerRank -> {
+                            if (playerRank != null) {
+                                source.sendMessage(Component.text("Your current rank: " + playerRank.getFormattedRank(), NamedTextColor.AQUA));
+                                source.sendMessage(Component.text("Main Rank: " + playerRank.getMainRank() + ", Sub Rank: " + playerRank.getSubRank(), NamedTextColor.GREEN));
+                                source.sendMessage(Component.text("Play Time: " + playerRank.getPlayTimeMinutes() + " minutes", NamedTextColor.YELLOW));
+                                source.sendMessage(Component.text("Achievements: " + playerRank.getAchievementsCompleted(), NamedTextColor.YELLOW));
+                            } else {
+                                source.sendMessage(Component.text("Could not retrieve your rank information. Please try again later.", NamedTextColor.RED));
+                            }
+                        }).exceptionally(ex -> {
+                            source.sendMessage(Component.text("Could not retrieve your rank information. Please try again later.", NamedTextColor.RED));
+                            logger.error("Error fetching rank for player " + username, ex);
+                            return null;
+                        });
                     } catch (Exception e) {
                         source.sendMessage(Component.text("Could not retrieve your rank information. Please try again later.", NamedTextColor.RED));
                         logger.error("Error fetching rank for player " + username, e);
                     }
                 } else {
-                    source.sendMessage(Component.text("This command can only be used by players.", NamedTextColor.RED));
+                    if (source != null) {
+                        source.sendMessage(Component.text("This command can only be used by players.", NamedTextColor.RED));
+                    }
                 }
                 return Command.SINGLE_SUCCESS;
             })
             .build();
 
         return new BrigadierCommand(rankNode);
+    }
+
+    /**
+     * createXPChartCommand method
+     * Creates the BrigadierCommand for the /xpchart command.
+     * Allows players to view a chart of XP required for each rank.
+     *
+     * @return The BrigadierCommand instance for /xpchart
+     */
+    private BrigadierCommand createXPChartCommand() {
+        LiteralCommandNode<CommandSource> xpChartNode = BrigadierCommand.literalArgumentBuilder("xpchart")
+            .executes(context -> {
+                CommandSource source = context.getSource();
+                try {
+                    if (xpManager == null) {
+                        source.sendMessage(Component.text("XP Chart feature is currently disabled.", NamedTextColor.YELLOW));
+                        source.sendMessage(Component.text("Use /rank to check your current rank and progress.", NamedTextColor.GRAY));
+                    } else {
+                        source.sendMessage(Component.text("XP Chart feature is being implemented.", NamedTextColor.YELLOW));
+                        source.sendMessage(Component.text("Use /rank to check your current rank and progress.", NamedTextColor.GRAY));
+                    }
+                } catch (Exception e) {
+                    source.sendMessage(Component.text("Could not retrieve XP chart. Please try again later.", NamedTextColor.RED));
+                    logger.error("Error fetching XP chart", e);
+                }
+                return Command.SINGLE_SUCCESS;
+            })
+            .build();
+
+        return new BrigadierCommand(xpChartNode);
     }
 
     /**
@@ -414,7 +425,8 @@ public class BrigadierCommandHandler {
                     debugLog("Admin " + source + " attempting configuration reload");
                     
                     // Note: Configuration reload requires restarting the plugin or proxy
-                    // A full implementation would need access to the main plugin instance                    source.sendMessage(Component.text("Configuration reload is not implemented yet.", NamedTextColor.YELLOW));
+                    // A full implementation would need access to the main plugin instance
+                    source.sendMessage(Component.text("Configuration reload is not implemented yet.", NamedTextColor.YELLOW));
                     source.sendMessage(Component.text("Please restart the proxy to reload configuration changes.", NamedTextColor.GRAY));
                     
                     return Command.SINGLE_SUCCESS;

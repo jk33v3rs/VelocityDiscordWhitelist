@@ -2,6 +2,7 @@ package top.jk33v3rs.velocitydiscordwhitelist.modules;
 
 import org.slf4j.Logger;
 import top.jk33v3rs.velocitydiscordwhitelist.database.SQLHandler;
+import top.jk33v3rs.velocitydiscordwhitelist.utils.ExceptionHandler;
 
 import java.util.Map;
 import java.util.Optional;
@@ -222,12 +223,12 @@ public class EnhancedPurgatoryManager {
             return errorMessage;
         }
     }
-    
-    private final ConcurrentHashMap<String, PurgatorySession> sessions;
+      private final ConcurrentHashMap<String, PurgatorySession> sessions;
     private final Logger logger;
     private final boolean debugEnabled;
     private final SQLHandler sqlHandler;
     private final int sessionTimeoutMinutes;
+    private final ExceptionHandler exceptionHandler;
     private RewardsHandler rewardsHandler;
     private java.util.function.BiFunction<String, UUID, CompletableFuture<Boolean>> purgatoryRemovalCallback;
 
@@ -238,13 +239,13 @@ public class EnhancedPurgatoryManager {
      * @param debugEnabled Whether debug logging is enabled
      * @param sqlHandler The SQL handler instance
      * @param sessionTimeoutMinutes The default timeout for sessions in minutes
-     */
-    public EnhancedPurgatoryManager(Logger logger, boolean debugEnabled, SQLHandler sqlHandler, int sessionTimeoutMinutes) {
+     */    public EnhancedPurgatoryManager(Logger logger, boolean debugEnabled, SQLHandler sqlHandler, int sessionTimeoutMinutes) {
         this.sessions = new ConcurrentHashMap<>();
         this.logger = logger;
         this.debugEnabled = debugEnabled;
         this.sqlHandler = sqlHandler;
         this.sessionTimeoutMinutes = sessionTimeoutMinutes;
+        this.exceptionHandler = new ExceptionHandler(logger, debugEnabled);
         
         // Start periodic cleanup
         startCleanupTask();
@@ -423,12 +424,13 @@ public class EnhancedPurgatoryManager {
                 discordUserId,
                 session.getDiscordUsername()
             );
-            
-            if (linked) {
+              if (linked) {
                 debugLog("Linked Discord account " + discordUserId + 
                       " to Minecraft account " + username);
             } else {
-                logger.error("Failed to link Discord account to Minecraft account");
+                exceptionHandler.handleDatabaseException("Discord account linking", 
+                    new RuntimeException("Failed to link Discord account to Minecraft account"), 
+                    "Username: " + username + ", Discord ID: " + discordUserId);
             }
         }
         
@@ -441,41 +443,41 @@ public class EnhancedPurgatoryManager {
             
             // Call purgatory removal callback if available
             if (purgatoryRemovalCallback != null) {
-                purgatoryRemovalCallback.apply(username, uuid)
-                    .thenAccept(removalSuccess -> {
+                purgatoryRemovalCallback.apply(username, uuid)                    .thenAccept(removalSuccess -> {
                         if (removalSuccess) {
                             debugLog("Successfully removed purgatory restrictions for " + username);
                         } else {
-                            logger.warn("Failed to remove purgatory restrictions for " + username);
+                            exceptionHandler.executeWithHandling("purgatory restrictions removal for " + username, 
+                                () -> logger.warn("Failed to remove purgatory restrictions for " + username));
                         }
-                    })
-                    .exceptionally(e -> {
-                        logger.error("Error removing purgatory restrictions for " + username, e);
+                    })                    .exceptionally(e -> {
+                        exceptionHandler.handleIntegrationException("purgatory restrictions removal", "Username: " + username, e);
                         return null;
                     });
             }
             
             // Process rewards (if RewardsHandler is available)
             if (rewardsHandler != null) {
-                rewardsHandler.handleVerificationRewards(uuid.toString(), session.getDiscordUserId())
-                    .thenAccept(rewardsSuccess -> {
+                rewardsHandler.handleVerificationRewards(uuid.toString(), session.getDiscordUserId())                    .thenAccept(rewardsSuccess -> {
                         if (rewardsSuccess) {
                             debugLog("Successfully processed rewards for " + username);
                         } else {
-                            logger.warn("Failed to process rewards for " + username);
+                            exceptionHandler.executeWithHandling("rewards processing for " + username, 
+                                () -> logger.warn("Failed to process rewards for " + username));
                         }
                         future.complete(true);
                     })
                     .exceptionally(e -> {
-                        logger.error("Error processing rewards", e);
+                        exceptionHandler.handleIntegrationException("rewards processing", "Username: " + username, e);
                         future.complete(true); // Still complete the verification even if rewards fail
                         return null;
                     });
             } else {
                 future.complete(true);
-            }
-        } else {
-            logger.error("Failed to update verification state in database for " + username);
+            }        } else {
+            exceptionHandler.handleDatabaseException("verification state update", 
+                new RuntimeException("Failed to update verification state in database"), 
+                "Username: " + username + ", UUID: " + uuid);
             future.complete(false);
         }
         

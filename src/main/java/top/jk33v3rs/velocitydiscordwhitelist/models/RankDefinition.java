@@ -116,16 +116,16 @@ public class RankDefinition {
      * @return The subrank name
      */
     public static String getSubRankNameById(int subRankId) {
-        switch (subRankId) {
-            case 1: return "novice";
-            case 2: return "apprentice";
-            case 3: return "adept";
-            case 4: return "master";
-            case 5: return "heroic";
-            case 6: return "mythic";
-            case 7: return "immortal";
-            default: return "unknown";
-        }
+        return switch (subRankId) {
+            case 1 -> "novice";
+            case 2 -> "apprentice";
+            case 3 -> "adept";
+            case 4 -> "master";
+            case 5 -> "heroic";
+            case 6 -> "mythic";
+            case 7 -> "immortal";
+            default -> "unknown";
+        };
     }
     
     /**
@@ -137,16 +137,16 @@ public class RankDefinition {
     public static int getSubRankIdByName(String subRankName) {
         if (subRankName == null) return 0;
         
-        switch (subRankName.toLowerCase()) {
-            case "novice": return 1;
-            case "apprentice": return 2;
-            case "adept": return 3;
-            case "master": return 4;
-            case "heroic": return 5;
-            case "mythic": return 6;
-            case "immortal": return 7;
-            default: return 0;
-        }
+        return switch (subRankName.toLowerCase()) {
+            case "novice" -> 1;
+            case "apprentice" -> 2;
+            case "adept" -> 3;
+            case "master" -> 4;
+            case "heroic" -> 5;
+            case "mythic" -> 6;
+            case "immortal" -> 7;
+            default -> 0;
+        };
     }
     
     /**
@@ -173,34 +173,34 @@ public class RankDefinition {
      * @return The main rank name
      */
     public static String getMainRankNameById(int mainRankId) {
-        switch (mainRankId) {
-            case 1: return "bystander";
-            case 2: return "onlooker";
-            case 3: return "wanderer";
-            case 4: return "traveller";
-            case 5: return "explorer";
-            case 6: return "adventurer";
-            case 7: return "surveyor";
-            case 8: return "navigator";
-            case 9: return "journeyman";
-            case 10: return "pathfinder";
-            case 11: return "trailblazer";
-            case 12: return "pioneer";
-            case 13: return "craftsman";
-            case 14: return "specialist";
-            case 15: return "artisan";
-            case 16: return "veteran";
-            case 17: return "sage";
-            case 18: return "luminary";
-            case 19: return "titan";
-            case 20: return "legend";
-            case 21: return "eternal";
-            case 22: return "ascendant";
-            case 23: return "celestial";
-            case 24: return "divine";
-            case 25: return "deity";
-            default: return "unknown";
-        }
+        return switch (mainRankId) {
+            case 1 -> "bystander";
+            case 2 -> "onlooker";
+            case 3 -> "wanderer";
+            case 4 -> "traveller";
+            case 5 -> "explorer";
+            case 6 -> "adventurer";
+            case 7 -> "surveyor";
+            case 8 -> "navigator";
+            case 9 -> "journeyman";
+            case 10 -> "pathfinder";
+            case 11 -> "trailblazer";
+            case 12 -> "pioneer";
+            case 13 -> "craftsman";
+            case 14 -> "specialist";
+            case 15 -> "artisan";
+            case 16 -> "veteran";
+            case 17 -> "sage";
+            case 18 -> "luminary";
+            case 19 -> "titan";
+            case 20 -> "legend";
+            case 21 -> "eternal";
+            case 22 -> "ascendant";
+            case 23 -> "celestial";
+            case 24 -> "divine";
+            case 25 -> "deity";
+            default -> "unknown";
+        };
     }
     
     /**
@@ -212,34 +212,34 @@ public class RankDefinition {
     public static int getMainRankIdByName(String mainRankName) {
         if (mainRankName == null) return 0;
         
-        switch (mainRankName.toLowerCase()) {
-            case "bystander": return 1;
-            case "onlooker": return 2;
-            case "wanderer": return 3;
-            case "traveller": return 4;
-            case "explorer": return 5;
-            case "adventurer": return 6;
-            case "surveyor": return 7;
-            case "navigator": return 8;
-            case "journeyman": return 9;
-            case "pathfinder": return 10;
-            case "trailblazer": return 11;
-            case "pioneer": return 12;
-            case "craftsman": return 13;
-            case "specialist": return 14;
-            case "artisan": return 15;
-            case "veteran": return 16;
-            case "sage": return 17;
-            case "luminary": return 18;
-            case "titan": return 19;
-            case "legend": return 20;
-            case "eternal": return 21;
-            case "ascendant": return 22;
-            case "celestial": return 23;
-            case "divine": return 24;
-            case "deity": return 25;
-            default: return 0;
-        }
+        return switch (mainRankName.toLowerCase()) {
+            case "bystander" -> 1;
+            case "onlooker" -> 2;
+            case "wanderer" -> 3;
+            case "traveller" -> 4;
+            case "explorer" -> 5;
+            case "adventurer" -> 6;
+            case "surveyor" -> 7;
+            case "navigator" -> 8;
+            case "journeyman" -> 9;
+            case "pathfinder" -> 10;
+            case "trailblazer" -> 11;
+            case "pioneer" -> 12;
+            case "craftsman" -> 13;
+            case "specialist" -> 14;
+            case "artisan" -> 15;
+            case "veteran" -> 16;
+            case "sage" -> 17;
+            case "luminary" -> 18;
+            case "titan" -> 19;
+            case "legend" -> 20;
+            case "eternal" -> 21;
+            case "ascendant" -> 22;
+            case "celestial" -> 23;
+            case "divine" -> 24;
+            case "deity" -> 25;
+            default -> 0;
+        };
     }
     
     /**

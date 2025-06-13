@@ -1,9 +1,18 @@
 package top.jk33v3rs.velocitydiscordwhitelist.integrations;
 
-import org.slf4j.Logger;
-import top.jk33v3rs.velocitydiscordwhitelist.utils.LoggingUtils;
-import java.util.*;
+import java.lang.reflect.InvocationTargetException;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+
+import org.slf4j.Logger;
+
+import top.jk33v3rs.velocitydiscordwhitelist.utils.ExceptionHandler;
+import top.jk33v3rs.velocitydiscordwhitelist.utils.LoggingUtils;
 
 /**
  * LuckPerms integration for permission management
@@ -15,17 +24,21 @@ public class LuckPermsIntegration {
     private final boolean debugEnabled;
     private final Map<String, Object> config;
     private final boolean enabled;
+    private final ExceptionHandler exceptionHandler;
 
     /**
-     * @param logger Logger instance
-     * @param debugEnabled Debug mode flag
-     * @param config Configuration map
+     * LuckPermsIntegration Constructor
+     * 
+     * @param logger Logger instance for this integration
+     * @param debugEnabled Debug mode flag to enable verbose logging
+     * @param config Configuration map containing LuckPerms settings
      */
     @SuppressWarnings("unchecked")
     public LuckPermsIntegration(Logger logger, boolean debugEnabled, Map<String, Object> config) {
         this.logger = logger;
         this.debugEnabled = debugEnabled;
         this.config = config;
+        this.exceptionHandler = new ExceptionHandler(logger, debugEnabled);
         
         Map<String, Object> luckPermsConfig = (Map<String, Object>) config.getOrDefault("luckperms", Map.of());
         this.enabled = Boolean.parseBoolean(luckPermsConfig.getOrDefault("enabled", "false").toString());
@@ -40,19 +53,22 @@ public class LuckPermsIntegration {
                 userManagerInstance = luckPermsInstance.getClass().getMethod("getUserManager").invoke(luckPermsInstance);
                 LoggingUtils.debugLog(logger, debugEnabled, "LuckPerms integration initialized successfully");
             } catch (ClassNotFoundException e) {
-                logger.warn("LuckPerms not available - classes not found");
-            } catch (Exception e) {
-                logger.error("Error initializing LuckPerms integration", e);
+                exceptionHandler.handleIntegrationException("LuckPerms", "initialization - classes not found", e);
+            } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+                exceptionHandler.handleIntegrationException("LuckPerms", "initialization", e);
             }
         }
         
         this.luckPerms = luckPermsInstance;
         this.userManager = userManagerInstance;
         
-        LoggingUtils.debugLog(logger, debugEnabled, "LuckPermsIntegration initialized - Available: " + isAvailable());
+        // Debug logging moved to avoid overridable method call in constructor
+        LoggingUtils.debugLog(logger, debugEnabled, "LuckPermsIntegration initialized - Available: " + (enabled && luckPermsInstance != null && userManagerInstance != null));
     }
 
     /**
+     * isAvailable Method
+     * 
      * @return true if LuckPerms integration is available and enabled
      */
     public boolean isAvailable() {
@@ -60,9 +76,10 @@ public class LuckPermsIntegration {
     }
 
     /**
+     * loadUser Method
      * Loads a user by UUID, creating if necessary
      * 
-     * @param playerUuid The UUID of the player
+     * @param playerUuid The UUID of the player to load
      * @return CompletableFuture containing the User object, or empty if failed
      */
     @SuppressWarnings("unchecked")
@@ -71,25 +88,28 @@ public class LuckPermsIntegration {
             return CompletableFuture.completedFuture(Optional.empty());
         }
 
-        try {
-            CompletableFuture<Object> userFuture = (CompletableFuture<Object>) userManager.getClass()
-                .getMethod("loadUser", UUID.class).invoke(userManager, playerUuid);
-            
-            return userFuture.thenApply(Optional::of)
-                .exceptionally(throwable -> {
-                    logger.error("Error loading user " + playerUuid, throwable);
-                    return Optional.empty();
-                });
-        } catch (Exception e) {
-            logger.error("Error invoking loadUser for " + playerUuid, e);
-            return CompletableFuture.completedFuture(Optional.empty());
-        }
+        return exceptionHandler.executeAsyncWithHandling("loading user " + playerUuid, () -> {
+            try {
+                CompletableFuture<Object> userFuture = (CompletableFuture<Object>) userManager.getClass()
+                    .getMethod("loadUser", UUID.class).invoke(userManager, playerUuid);
+                
+                return userFuture.thenApply(Optional::of)
+                    .exceptionally(throwable -> {
+                        exceptionHandler.handleIntegrationException("LuckPerms", "loadUser", throwable);
+                        return Optional.empty();
+                    });
+            } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+                exceptionHandler.handleIntegrationException("LuckPerms", "loadUser reflection", e);
+                return CompletableFuture.completedFuture(Optional.empty());
+            }
+        });
     }
 
     /**
+     * addPlayerToGroup Method
      * Adds a player to a group using LuckPerms
      * 
-     * @param playerUuid The UUID of the player
+     * @param playerUuid The UUID of the player to add to group
      * @param groupName The name of the group to add the player to
      * @param context The context for the permission (e.g., server, world)
      * @return CompletableFuture that resolves to true if successful
@@ -103,7 +123,8 @@ public class LuckPermsIntegration {
 
         return loadUser(playerUuid).thenCompose(userOpt -> {
             if (userOpt.isEmpty()) {
-                logger.warn("Could not load user {} for group assignment", playerUuid);
+                exceptionHandler.handleIntegrationException("LuckPerms", "user loading for group assignment", 
+                    new RuntimeException("Could not load user for group assignment: " + playerUuid));
                 return CompletableFuture.completedFuture(false);
             }
 
@@ -135,12 +156,11 @@ public class LuckPermsIntegration {
                     logger.info("Added player {} to group {} with context {}", playerUuid, groupName, context);
                     return true;
                 }).exceptionally(throwable -> {
-                    logger.error("Error saving user " + playerUuid + " after group assignment", throwable);
+                    exceptionHandler.handleIntegrationException("LuckPerms", "save user after group assignment", throwable);
                     return false;
                 });
-                
-            } catch (Exception e) {
-                logger.error("Error adding player to group using reflection", e);
+            } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+                exceptionHandler.handleIntegrationException("LuckPerms", "adding player to group: " + groupName, e);
                 return CompletableFuture.completedFuture(false);
             }
         });
@@ -163,7 +183,8 @@ public class LuckPermsIntegration {
 
         return loadUser(playerUuid).thenCompose(userOpt -> {
             if (userOpt.isEmpty()) {
-                logger.warn("Could not load user {} for group removal", playerUuid);
+                exceptionHandler.handleIntegrationException("LuckPerms", "user loading for group removal",
+                    new RuntimeException("Could not load user for group removal: " + playerUuid));
                 return CompletableFuture.completedFuture(false);
             }
 
@@ -195,12 +216,11 @@ public class LuckPermsIntegration {
                     logger.info("Removed player {} from group {} with context {}", playerUuid, groupName, context);
                     return true;
                 }).exceptionally(throwable -> {
-                    logger.error("Error saving user " + playerUuid + " after group removal", throwable);
+                    exceptionHandler.handleIntegrationException("LuckPerms", "save user after group removal", throwable);
                     return false;
                 });
-                
-            } catch (Exception e) {
-                logger.error("Error removing player from group using reflection", e);
+            } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+                exceptionHandler.handleIntegrationException("LuckPerms", "removing player from group: " + groupName, e);
                 return CompletableFuture.completedFuture(false);
             }
         });
@@ -220,7 +240,8 @@ public class LuckPermsIntegration {
 
         return loadUser(playerUuid).thenApply(userOpt -> {
             if (userOpt.isEmpty()) {
-                logger.warn("Could not load user {} for group lookup", playerUuid);
+                exceptionHandler.handleIntegrationException("LuckPerms", "user loading for group lookup",
+                    new RuntimeException("Could not load user for group lookup: " + playerUuid));
                 return new HashSet<String>();
             }
 
@@ -239,8 +260,8 @@ public class LuckPermsIntegration {
                 }
                 
                 return groups;
-            } catch (Exception e) {
-                logger.error("Error getting player groups using reflection", e);
+            } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+                exceptionHandler.handleIntegrationException("LuckPerms", "getting player groups", e);
                 return new HashSet<String>();
             }
         });
@@ -260,7 +281,8 @@ public class LuckPermsIntegration {
 
         return loadUser(playerUuid).thenApply(userOpt -> {
             if (userOpt.isEmpty()) {
-                logger.warn("Could not load user {} for primary group lookup", playerUuid);
+                exceptionHandler.handleIntegrationException("LuckPerms", "user loading for primary group lookup",
+                    new RuntimeException("Could not load user for primary group lookup: " + playerUuid));
                 return Optional.<String>empty();
             }
 
@@ -268,8 +290,8 @@ public class LuckPermsIntegration {
                 Object user = userOpt.get();
                 String primaryGroup = (String) user.getClass().getMethod("getPrimaryGroup").invoke(user);
                 return Optional.of(primaryGroup);
-            } catch (Exception e) {
-                logger.error("Error getting primary group using reflection", e);
+            } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+                exceptionHandler.handleIntegrationException("LuckPerms", "getting primary group", e);
                 return Optional.<String>empty();
             }
         });
@@ -291,7 +313,8 @@ public class LuckPermsIntegration {
 
         return loadUser(playerUuid).thenCompose(userOpt -> {
             if (userOpt.isEmpty()) {
-                logger.warn("Could not load user {} for primary group setting", playerUuid);
+                exceptionHandler.handleIntegrationException("LuckPerms", "user loading for primary group setting",
+                    new RuntimeException("Could not load user for primary group setting: " + playerUuid));
                 return CompletableFuture.completedFuture(false);
             }
 
@@ -306,11 +329,11 @@ public class LuckPermsIntegration {
                     logger.info("Set primary group of player {} to {}", playerUuid, groupName);
                     return true;
                 }).exceptionally(throwable -> {
-                    logger.error("Error saving user " + playerUuid + " after primary group setting", throwable);
+                    exceptionHandler.handleIntegrationException("LuckPerms", "save user after primary group setting", throwable);
                     return false;
                 });
-            } catch (Exception e) {
-                logger.error("Error setting primary group using reflection", e);
+            } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+                exceptionHandler.handleIntegrationException("LuckPerms", "setting primary group: " + groupName, e);
                 return CompletableFuture.completedFuture(false);
             }
         });
@@ -333,7 +356,7 @@ public class LuckPermsIntegration {
         }
 
         return CompletableFuture.supplyAsync(() -> {
-            try {
+            return exceptionHandler.executeWithHandling("syncing rank groups for player " + playerUuid, () -> {
                 Map<String, Object> luckPermsConfig = (Map<String, Object>) config.getOrDefault("luckperms", Map.of());
                 
                 // Get current groups
@@ -363,10 +386,7 @@ public class LuckPermsIntegration {
                 }
                 
                 return true;
-            } catch (Exception e) {
-                logger.error("Error syncing rank groups for player " + playerUuid, e);
-                return false;
-            }
+            }, false);
         });
     }
 
