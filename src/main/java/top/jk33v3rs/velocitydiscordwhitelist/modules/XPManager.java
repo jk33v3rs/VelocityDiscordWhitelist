@@ -62,21 +62,21 @@ public class XPManager {
     private final double insaneDifficultyMultiplier;
     private final double terralithBonus;
     private final double hardcoreBonus;
-    
-    /**
+      /**
      * Constructor for XPManager
      * 
      * @param sqlHandler The SQL handler for database operations
      * @param logger The logger instance
      * @param debugEnabled Whether debug logging is enabled
      * @param config The configuration map containing XP and rate limiting settings
+     * @param exceptionHandler The centralized exception handler
      */
     @SuppressWarnings("unchecked")
-    public XPManager(SQLHandler sqlHandler, Logger logger, boolean debugEnabled, Map<String, Object> config) {
+    public XPManager(SQLHandler sqlHandler, Logger logger, boolean debugEnabled, Map<String, Object> config, ExceptionHandler exceptionHandler) {
         this.sqlHandler = sqlHandler;
         this.logger = logger;
         this.debugEnabled = debugEnabled;
-        this.exceptionHandler = new ExceptionHandler(logger, debugEnabled);
+        this.exceptionHandler = exceptionHandler;
         
         // Initialize collections
         this.lastEventTime = new ConcurrentHashMap<>();

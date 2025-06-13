@@ -21,6 +21,7 @@ import top.jk33v3rs.velocitydiscordwhitelist.database.SQLHandler;
 import top.jk33v3rs.velocitydiscordwhitelist.modules.EnhancedPurgatoryManager;
 import top.jk33v3rs.velocitydiscordwhitelist.modules.RewardsHandler;
 import top.jk33v3rs.velocitydiscordwhitelist.modules.XPManager;
+import top.jk33v3rs.velocitydiscordwhitelist.utils.ExceptionHandler;
 
 /** Handles Minecraft commands including /verify, /rank, /xpchart, and VWL admin commands. */
 public class BrigadierCommandHandler {
@@ -31,6 +32,7 @@ public class BrigadierCommandHandler {
     private final XPManager xpManager;
     private final SQLHandler sqlHandler;
     private final boolean debugEnabled;
+    private final ExceptionHandler exceptionHandler;
 
     /**
      * Constructor for BrigadierCommandHandler
@@ -42,9 +44,11 @@ public class BrigadierCommandHandler {
      * @param xpManager The XP manager for experience tracking
      * @param sqlHandler The SQL handler for database operations
      * @param debugEnabled Whether debug logging is enabled
+     * @param exceptionHandler The centralized exception handler
      */
     public BrigadierCommandHandler(ProxyServer server, Logger logger, EnhancedPurgatoryManager purgatoryManager,
-                                 RewardsHandler rewardsHandler, XPManager xpManager, SQLHandler sqlHandler, boolean debugEnabled) {
+                                 RewardsHandler rewardsHandler, XPManager xpManager, SQLHandler sqlHandler, 
+                                 boolean debugEnabled, ExceptionHandler exceptionHandler) {
         this.server = server;
         this.logger = logger;
         this.purgatoryManager = purgatoryManager;
@@ -52,6 +56,7 @@ public class BrigadierCommandHandler {
         this.xpManager = xpManager;
         this.sqlHandler = sqlHandler;
         this.debugEnabled = debugEnabled;
+        this.exceptionHandler = exceptionHandler;
         
         // Initialize commands after all fields are set
         initializeCommands();
@@ -64,9 +69,17 @@ public class BrigadierCommandHandler {
      */
     private void initializeCommands() {
         try {
-            this.registerCommands();
+            // Delay command registration slightly to ensure server is ready
+            if (server != null && server.getCommandManager() != null) {
+                this.registerCommands();
+                logger.info("Commands registered successfully");
+            } else {
+                // Store a flag to register commands later when server is ready
+                logger.info("Server or CommandManager not ready, commands will be registered when registerCommands() is called explicitly");
+                // Commands will be registered when registerCommands() is called explicitly
+            }
         } catch (RuntimeException e) {
-            logger.error("Failed to register commands during initialization", e);
+            exceptionHandler.handleIntegrationException("BrigadierCommandHandler", "command registration", e);
         }
     }
 
@@ -255,7 +268,11 @@ public class BrigadierCommandHandler {
                         });
                     } catch (Exception e) {
                         source.sendMessage(Component.text("Could not retrieve your rank information. Please try again later.", NamedTextColor.RED));
-                        logger.error("Error fetching rank for player " + username, e);
+                        if (source instanceof Player) {
+                            exceptionHandler.handlePlayerException((Player) source, "rank command", e, username);
+                        } else {
+                            exceptionHandler.handleIntegrationException("BrigadierCommandHandler", "rank command", e);
+                        }
                     }
                 } else {
                     if (source != null) {
@@ -290,7 +307,7 @@ public class BrigadierCommandHandler {
                     }
                 } catch (Exception e) {
                     source.sendMessage(Component.text("Could not retrieve XP chart. Please try again later.", NamedTextColor.RED));
-                    logger.error("Error fetching XP chart", e);
+                    exceptionHandler.handlePlayerException(null, "XP chart command", e, "XP chart retrieval failed");
                 }
                 return Command.SINGLE_SUCCESS;
             })
@@ -332,7 +349,7 @@ public class BrigadierCommandHandler {
                             }
                         }).exceptionally(ex -> {
                             source.sendMessage(Component.text("Error adding player to whitelist: " + ex.getMessage(), NamedTextColor.RED));
-                            logger.error("Error adding player to whitelist", ex);
+                            exceptionHandler.handleDatabaseException("whitelist add", ex, "Adding player: " + playerName);
                             return null;
                         });
                         
@@ -361,7 +378,7 @@ public class BrigadierCommandHandler {
                             }
                         }).exceptionally(ex -> {
                             source.sendMessage(Component.text("Error removing player from whitelist: " + ex.getMessage(), NamedTextColor.RED));
-                            logger.error("Error removing player from whitelist", ex);
+                            exceptionHandler.handleDatabaseException("whitelist remove", ex, "Removing player: " + playerName);
                             return null;
                         });
                         

@@ -150,9 +150,7 @@ public class DataBackupHandler {    private final Logger logger;
     public CompletableFuture<Boolean> restoreBackup(Path backupFile, boolean overwriteExisting) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                logger.info("Starting backup restoration from: {}", backupFile.getFileName());
-                
-                if (!Files.exists(backupFile)) {
+                logger.info("Starting backup restoration from: {}", backupFile.getFileName());                if (!Files.exists(backupFile)) {
                     logger.error("Backup file does not exist: {}", backupFile);
                     return false;
                 }
@@ -181,9 +179,11 @@ public class DataBackupHandler {    private final Logger logger;
                 
                 logger.info("Backup restoration completed successfully");
                 return true;
-                
-            } catch (Exception e) {
-                logger.error("Failed to restore backup", e);
+                  } catch (Exception e) {
+                // Use ExceptionHandler for centralized error handling
+                exceptionHandler.executeWithHandling("restore backup", () -> {
+                    throw new RuntimeException("Failed to restore backup", e);
+                });
                 return false;
             }
         });
@@ -213,18 +213,23 @@ public class DataBackupHandler {    private final Logger logger;
                     }
                     case "sql" -> {
                         return exportToSql(exportFile, includeTimestamps);
-                    }
-                    default -> {
-                        logger.error("Unsupported export format: {}", format);
+                    }                    default -> {
+                        exceptionHandler.executeWithHandling("export data", () -> {
+                            throw new IllegalArgumentException("Unsupported export format: " + format);
+                        });
                         return null;
                     }
                 }
                 
             } catch (IOException e) {
-                logger.error("IO error during data export", e);
+                exceptionHandler.executeWithHandling("data export I/O", () -> {
+                    throw new RuntimeException("IO error during data export", e);
+                });
                 return null;
             } catch (SecurityException e) {
-                logger.error("Security error during data export", e);
+                exceptionHandler.executeWithHandling("data export security", () -> {
+                    throw new RuntimeException("Security error during data export", e);
+                });
                 return null;
             }
         });
@@ -259,9 +264,10 @@ public class DataBackupHandler {    private final Logger logger;
             
             // Sort by creation date (newest first)
             backups.sort((a, b) -> b.createdAt.compareTo(a.createdAt));
-            
-        } catch (IOException e) {
-            logger.error("Failed to list backup files", e);
+              } catch (IOException e) {
+            exceptionHandler.executeWithHandling("list backup files", () -> {
+                throw new RuntimeException("Failed to list backup files", e);
+            });
         }
         
         return backups;
@@ -275,44 +281,49 @@ public class DataBackupHandler {    private final Logger logger;
      */
     public boolean validateBackup(Path backupFile) {
         try {
-            logger.info("Validating backup file: {}", backupFile.getFileName());
-            
-            if (!Files.exists(backupFile)) {
-                logger.error("Backup file does not exist");
-                return false;
+            logger.info("Validating backup file: {}", backupFile.getFileName());            if (!Files.exists(backupFile)) {
+                return exceptionHandler.executeWithHandling("validate backup file existence", () -> {
+                    throw new IllegalArgumentException("Backup file does not exist");
+                }, false);
             }
             
             BackupData backupData = readBackupFile(backupFile);
             if (backupData == null) {
-                logger.error("Failed to read backup data");
-                return false;
+                return exceptionHandler.executeWithHandling("read backup data for validation", () -> {
+                    throw new RuntimeException("Failed to read backup data");
+                }, false);
             }
             
             // Validate metadata
             if (backupData.metadata == null) {
-                logger.error("Backup metadata is missing");
-                return false;
+                return exceptionHandler.executeWithHandling("validate backup metadata", () -> {
+                    throw new RuntimeException("Backup metadata is missing");
+                }, false);
             }
             
             // Validate required fields
             if (backupData.metadata.version == null || 
                 backupData.metadata.createdAt == null ||
                 backupData.metadata.pluginVersion == null) {
-                logger.error("Required metadata fields are missing");
-                return false;
+                return exceptionHandler.executeWithHandling("validate backup metadata fields", () -> {
+                    throw new RuntimeException("Required metadata fields are missing");
+                }, false);
             }
             
             // Validate table structure
             if (backupData.tables == null) {
-                logger.error("Backup table data is missing");
-                return false;
+                return exceptionHandler.executeWithHandling("validate backup table data", () -> {
+                    throw new RuntimeException("Backup table data is missing");
+                }, false);
             }
             
             logger.info("Backup validation successful");
             return true;
             
         } catch (Exception e) {
-            logger.error("Backup validation failed", e);
+            exceptionHandler.executeWithHandling("backup validation", () -> {
+                throw new RuntimeException("Backup validation failed", e);
+            });
             return false;
         }
     }
@@ -435,9 +446,10 @@ public class DataBackupHandler {    private final Logger logger;
             }
             
             return gson.fromJson(jsonData, BackupData.class);
-            
-        } catch (IOException | JsonSyntaxException e) {
-            logger.error("Failed to read backup file", e);
+              } catch (IOException | JsonSyntaxException e) {
+            exceptionHandler.executeWithHandling("read backup file", () -> {
+                throw new RuntimeException("Failed to read backup file", e);
+            });
             return null;
         }
     }
@@ -568,9 +580,10 @@ public class DataBackupHandler {    private final Logger logger;
                         logger.warn("Failed to remove old backup: {}", backup.fileName, e);
                     }
                 }
-            }
-        } catch (Exception e) {
-            logger.error("Failed to cleanup old backups", e);
+            }        } catch (Exception e) {
+            exceptionHandler.executeWithHandling("cleanup old backups", () -> {
+                throw new RuntimeException("Failed to cleanup old backups", e);
+            });
         }
     }
     

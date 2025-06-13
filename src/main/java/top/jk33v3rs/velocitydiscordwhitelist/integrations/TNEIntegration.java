@@ -5,6 +5,7 @@ package top.jk33v3rs.velocitydiscordwhitelist.integrations;
 import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
 import org.slf4j.Logger;
+import top.jk33v3rs.velocitydiscordwhitelist.utils.ExceptionHandler;
 
 import java.math.BigDecimal;
 import java.util.Map;
@@ -21,6 +22,7 @@ public class TNEIntegration {
     private final boolean debugEnabled;
     private final String targetServer;
     private final boolean enabled;
+    private final ExceptionHandler exceptionHandler;
     
     // Configuration values
     private final BigDecimal verificationReward;
@@ -30,11 +32,11 @@ public class TNEIntegration {
     private final boolean autoCreateAccounts;
 
     /** Creates TNEIntegration with proxy server, logger, debug flag and config map. */
-    @SuppressWarnings("unchecked")
-    public TNEIntegration(ProxyServer proxyServer, Logger logger, boolean debugEnabled, Map<String, Object> config) {
+    @SuppressWarnings("unchecked")    public TNEIntegration(ProxyServer proxyServer, Logger logger, boolean debugEnabled, Map<String, Object> config) {
         this.proxyServer = proxyServer;
         this.logger = logger;
         this.debugEnabled = debugEnabled;
+        this.exceptionHandler = new ExceptionHandler(logger, debugEnabled);
         
         Map<String, Object> tneConfig = (Map<String, Object>) config.getOrDefault("tne", Map.of());
         this.enabled = Boolean.parseBoolean(tneConfig.getOrDefault("enabled", "false").toString());
@@ -200,9 +202,10 @@ public class TNEIntegration {
                 
                 debugLog("Sent TNE command: " + action + " for player " + playerUuid + " amount " + amount);
                 return true;
-                
-            } catch (Exception e) {
-                logger.error("Error sending TNE economy command", e);
+                  } catch (Exception e) {
+                exceptionHandler.executeWithHandling("TNE economy command", () -> {
+                    throw new RuntimeException("Error sending TNE economy command", e);
+                });
                 return false;
             }
         });
@@ -212,9 +215,10 @@ public class TNEIntegration {
     public boolean reloadConfiguration() {
         try {
             debugLog("TNE Integration configuration reloaded successfully");
-            return true;
-        } catch (Exception e) {
-            logger.error("Error reloading TNE configuration", e);
+            return true;        } catch (Exception e) {
+            exceptionHandler.executeWithHandling("TNE configuration reload", () -> {
+                throw new RuntimeException("Error reloading TNE configuration", e);
+            });
             return false;
         }
     }

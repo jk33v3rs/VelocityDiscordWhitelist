@@ -111,31 +111,39 @@ public class DiscordBotHandler extends ListenerAdapter {
      */
     public CompletableFuture<Boolean> initialize(@Nonnull Properties config) {
         CompletableFuture<Boolean> initializationFuture = new CompletableFuture<>();
-        try {
-            // Get Discord configuration values
+        try {            // Get Discord configuration values
             String tokenRaw = config.getProperty("discord.token", "");
             String token = tokenRaw == null ? "" : tokenRaw.trim();
             // Note: Token logging removed for security reasons
-            this.guildId = config.getProperty("discord.guildId", "");
-            String channels = config.getProperty("discord.approvedChannelIds", "");
+            this.guildId = config.getProperty("discord.guild_id", "");
+            String verificationChannel = config.getProperty("discord.verification_channel", "");
+            String additionalChannels = config.getProperty("discord.approved_channels", "");
             int initTimeout = Integer.parseInt(config.getProperty("discord.init_timeout", "30"));
+            
+            // Combine verification channel with any additional approved channels
+            String channels = "";
+            if (!verificationChannel.isEmpty()) {
+                channels = verificationChannel;
+                if (!additionalChannels.isEmpty()) {
+                    channels += "," + additionalChannels;
+                }
+            } else if (!additionalChannels.isEmpty()) {
+                channels = additionalChannels;
+            }
 
             // Log token length and a masked version for debugging
             if (!token.isEmpty()) {
                 String masked = token.length() > 8 ? token.substring(0, 4) + "..." + token.substring(token.length() - 4)
                         : "(too short to mask)";
-                logger.info("[Discord] Loaded token: length={}, masked={}", token.length(), masked);
-                if (token.length() < 50) {
-                    logger.warn(
-                            "[Discord] Token length is suspiciously short ({} chars). Check for missing/incorrect value.",
-                            token.length());
+                logger.info("[Discord] Loaded token: length={}, masked={}", token.length(), masked);                if (token.length() < 50) {
+                    exceptionHandler.handleIntegrationException("Discord Bot", "token validation", 
+                        new IllegalArgumentException("Token length is suspiciously short (" + token.length() + " chars). Check for missing/incorrect Discord bot token value"));
                 }
                 if (!token.equals(tokenRaw)) {
                     logger.info("[Discord] Token was trimmed of whitespace before use.");
-                }
-                if (token.contains(" ") || token.contains("\n") || token.contains("\r")) {
-                    logger.warn(
-                            "[Discord] Token contains whitespace or newline characters. This may cause authentication errors.");
+                }                if (token.contains(" ") || token.contains("\n") || token.contains("\r")) {
+                    exceptionHandler.handleIntegrationException("Discord Bot", "token format validation", 
+                        new IllegalArgumentException("Token contains whitespace or newline characters. This may cause authentication errors"));
                 }
             }
 
@@ -532,11 +540,10 @@ public class DiscordBotHandler extends ListenerAdapter {
                         } else {
                             event.getHook().sendMessage("⚠️ Player **" + username + "** is already on the whitelist.")
                                     .setEphemeral(true).queue();
-                        }
-                    }).exceptionally(e -> {
+                        }                    }).exceptionally(e -> {
                         event.getHook().sendMessage("❗ Error adding player to whitelist: " + e.getMessage())
                                 .setEphemeral(true).queue();
-                        logger.error("[Discord] Error adding player to whitelist", e);
+                        exceptionHandler.handleDiscordException(event, "whitelist add database operation", e);
                         return null;
                     });
         } catch (IllegalArgumentException e) {
@@ -569,11 +576,10 @@ public class DiscordBotHandler extends ListenerAdapter {
                         } else {
                             event.getHook().sendMessage("⚠️ Player **" + username + "** was not on the whitelist.")
                                     .setEphemeral(true).queue();
-                        }
-                    }).exceptionally(ex -> {
+                        }                    }).exceptionally(ex -> {
                         event.getHook().sendMessage("❌ Error removing player from whitelist: " + ex.getMessage())
                                 .setEphemeral(true).queue();
-                        logger.error("[Discord] Error removing player from whitelist", ex);
+                        exceptionHandler.handleDiscordException(event, "whitelist remove database operation", ex);
                         return null;
                     });
         } catch (IllegalArgumentException e) {
@@ -608,11 +614,10 @@ public class DiscordBotHandler extends ListenerAdapter {
                         } else {
                             event.getHook().sendMessage("❌ Player **" + username + "** is not on the whitelist.")
                                     .setEphemeral(true).queue();
-                        }
-                    }).exceptionally(ex -> {
+                        }                    }).exceptionally(ex -> {
                         event.getHook().sendMessage("❌ Error checking whitelist status: " + ex.getMessage())
                                 .setEphemeral(true).queue();
-                        logger.error("[Discord] Error checking whitelist status", ex);
+                        exceptionHandler.handleDiscordException(event, "whitelist check database operation", ex);
                         return null;
                     });
         } catch (IllegalArgumentException e) {
@@ -1227,5 +1232,14 @@ public class DiscordBotHandler extends ListenerAdapter {
         future.complete(true);
 
         return future;
+    }
+
+    /**
+     * Checks if the Discord bot is connected and ready
+     * 
+     * @return true if connected, false otherwise
+     */
+    public boolean isConnected() {
+        return isConnected && jda != null && jda.getStatus() == JDA.Status.CONNECTED;
     }
 }

@@ -77,9 +77,8 @@ public class RewardsHandler {
      */
     private void initializeRankDefinitions() {
         try {
-            this.loadRankDefinitions();
-        } catch (RuntimeException e) {
-            logger.error("Failed to load rank definitions during initialization", e);
+            this.loadRankDefinitions();        } catch (RuntimeException e) {
+            exceptionHandler.handleIntegrationException("RewardsHandler", "rank definitions initialization", e);
         }
     }
     

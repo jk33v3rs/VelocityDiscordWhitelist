@@ -39,20 +39,22 @@ public class SQLHandler implements AutoCloseable {
     /**
      * Initializes the database connection pool and creates necessary tables
      * 
-     * @param config       The configuration map containing database settings
-     * @param logger       The logger instance for this class
-     * @param debugEnabled Whether debug logging is enabled
+     * @param config           The configuration map containing database settings
+     * @param logger           The logger instance for this class
+     * @param debugEnabled     Whether debug logging is enabled
+     * @param exceptionHandler The exception handler for centralized error handling
      * @throws RuntimeException if database initialization fails
      */
     @SuppressWarnings("unchecked")
-    public SQLHandler(Map<String, Object> config, Logger logger, boolean debugEnabled) {
+    public SQLHandler(Map<String, Object> config, Logger logger, boolean debugEnabled, ExceptionHandler exceptionHandler) {
         this.logger = logger;
         this.debugEnabled = debugEnabled;
-        this.exceptionHandler = new ExceptionHandler(logger, debugEnabled);
+        this.exceptionHandler = exceptionHandler;
 
         // Validate that config is not null
         if (config == null) {
-            logger.error("Configuration is null");
+            exceptionHandler.handleIntegrationException("SQLHandler", "configuration validation", 
+                new IllegalArgumentException("Configuration cannot be null"));
             throw new RuntimeException("Configuration cannot be null");
         }
 
@@ -60,7 +62,8 @@ public class SQLHandler implements AutoCloseable {
 
         // Validate that database config exists
         if (dbConfig == null) {
-            logger.error("Database configuration section not found in config");
+            exceptionHandler.handleIntegrationException("SQLHandler", "database configuration validation", 
+                new IllegalArgumentException("Database configuration is missing. Please check your config.yml file."));
             throw new RuntimeException("Database configuration is missing. Please check your config.yml file.");
         }
 
@@ -69,7 +72,7 @@ public class SQLHandler implements AutoCloseable {
         try {
             Class.forName("org.mariadb.jdbc.Driver");
         } catch (ClassNotFoundException e) {
-            logger.error("Failed to load MariaDB JDBC driver", e);
+            exceptionHandler.handleIntegrationException("SQLHandler", "JDBC driver loading", e);
             throw new RuntimeException("Failed to load MariaDB JDBC driver", e);
         }
 
@@ -99,7 +102,7 @@ public class SQLHandler implements AutoCloseable {
                 logger.info("Successfully initialized database connection pool");
             }
         } catch (Exception e) {
-            logger.error("Failed to initialize database connection pool", e);
+            exceptionHandler.handleDatabaseException("connection pool initialization", e, "HikariCP configuration");
             throw new RuntimeException("Failed to initialize database connection", e);
         }
     }
@@ -1358,5 +1361,19 @@ public class SQLHandler implements AutoCloseable {
         }
 
         return breakdown;
+    }
+
+    /**
+     * Tests the database connection to ensure it's working
+     * 
+     * @return true if connection is working, false otherwise
+     */
+    public boolean testConnection() {
+        try (Connection conn = getConnection()) {
+            return conn != null && !conn.isClosed() && conn.isValid(5);
+        } catch (SQLException e) {
+            exceptionHandler.handleDatabaseException("connection test", e, "Failed to test database connection");
+            return false;
+        }
     }
 }

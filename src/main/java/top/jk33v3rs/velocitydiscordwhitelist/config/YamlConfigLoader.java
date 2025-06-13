@@ -44,9 +44,8 @@ public class YamlConfigLoader {
         
         // Create data directory if it doesn't exist
         try {
-            Files.createDirectories(dataDirectory);
-        } catch (IOException e) {
-            logger.error("Failed to create data directory", e);
+            Files.createDirectories(dataDirectory);        } catch (IOException e) {
+            logger.error("Failed to create data directory: " + dataDirectory, e);
             return new LinkedHashMap<>();
         }
         

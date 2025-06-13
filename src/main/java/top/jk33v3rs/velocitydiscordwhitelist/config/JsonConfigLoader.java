@@ -65,17 +65,15 @@ public class JsonConfigLoader {
             // Store in cache
             loadedConfigs.put(fullFileName, config);
             
-            return config;
-        } catch (IOException | JsonSyntaxException | IllegalStateException e) {
-            logger.error("Failed to load config file: " + fullFileName, e);
+            return config;        } catch (IOException | JsonSyntaxException | IllegalStateException e) {
+            logger.error("Failed to load JSON config file: " + fullFileName + " - " + e.getClass().getSimpleName(), e);
             
             // Try to parse default config as fallback
             try {
                 JsonObject fallback = JsonParser.parseString(defaultConfig).getAsJsonObject();
                 loadedConfigs.put(fullFileName, fallback);
-                return fallback;
-            } catch (IllegalStateException | JsonSyntaxException ex) {
-                logger.error("Failed to parse default config due to JSON syntax or state issues", ex);
+                return fallback;            } catch (IllegalStateException | JsonSyntaxException ex) {
+                logger.error("Failed to parse default JSON config for fallback: " + fullFileName + " - " + ex.getClass().getSimpleName(), ex);
                 throw new RuntimeException("Failed to load or create config file: " + fullFileName, e);
             }
         }
