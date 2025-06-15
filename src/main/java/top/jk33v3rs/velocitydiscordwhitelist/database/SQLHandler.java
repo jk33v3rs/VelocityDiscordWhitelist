@@ -23,6 +23,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import top.jk33v3rs.velocitydiscordwhitelist.models.PlayerInfo;
 import top.jk33v3rs.velocitydiscordwhitelist.models.PlayerRank;
 import top.jk33v3rs.velocitydiscordwhitelist.models.RankDefinition;
+import top.jk33v3rs.velocitydiscordwhitelist.utils.DatabaseConfigValidator;
 import top.jk33v3rs.velocitydiscordwhitelist.utils.ExceptionHandler;
 
 /**
@@ -67,7 +68,33 @@ public class SQLHandler implements AutoCloseable {
             throw new RuntimeException("Database configuration is missing. Please check your config.yml file.");
         }
 
-        this.tableName = dbConfig.getOrDefault("table", "whitelist").toString();
+        this.tableName = dbConfig.getOrDefault("table", "whitelist").toString();        // Validate configuration before attempting connection
+        DatabaseConfigValidator validator = new DatabaseConfigValidator(exceptionHandler);
+        DatabaseConfigValidator.ValidationResult configResult = validator.validateConfig(config);
+        
+        if (!configResult.isValid()) {
+            exceptionHandler.handleIntegrationException("SQLHandler", "configuration validation", 
+                new IllegalArgumentException(configResult.getMessage()));
+            throw new RuntimeException("Database configuration validation failed: " + configResult.getMessage());
+        }
+        
+        if (debugEnabled) {
+            logger.info("Database configuration validated: {}", configResult.getMessage());
+        }
+        
+        // Test connectivity before creating connection pool
+        DatabaseConfigValidator.ValidationResult connectivityResult = validator.testConnectivity(config);
+        
+        if (!connectivityResult.isValid()) {
+            String errorMessage = "Database connectivity test failed: " + connectivityResult.getMessage();
+            exceptionHandler.handleIntegrationException("SQLHandler", "connectivity validation", 
+                new RuntimeException(errorMessage));
+            throw new RuntimeException(errorMessage);
+        }
+        
+        if (debugEnabled) {
+            logger.info("Database connectivity test passed: {}", connectivityResult.getMessage());
+        }
 
         try {
             Class.forName("org.mariadb.jdbc.Driver");
