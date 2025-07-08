@@ -769,7 +769,9 @@ public class SQLHandler implements AutoCloseable {
      * @param params The parameters for the query
      * @param mapper The function to map ResultSet to result type
      * @return Optional containing the result if found
-     */    private <T> Optional<T> executeQueryForSingleResult(String sql, Object[] params, ResultSetMapper<T> mapper) {
+     */
+    @SuppressWarnings("unused") // Helper method for future use    
+    private <T> Optional<T> executeQueryForSingleResult(String sql, Object[] params, ResultSetMapper<T> mapper) {
         return exceptionHandler.executeWithHandling("executing SQL query: " + sql, () -> {
             try (Connection conn = getConnection();
                     PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -823,7 +825,9 @@ public class SQLHandler implements AutoCloseable {
      * @param params The parameters for the query
      * @param mapper The function to map ResultSet to result type
      * @return List of results
-     */    private <T> List<T> executeQueryForMultipleResults(String sql, Object[] params, ResultSetMapper<T> mapper) {
+     */
+    @SuppressWarnings("unused") // Helper method for future use
+    private <T> List<T> executeQueryForMultipleResults(String sql, Object[] params, ResultSetMapper<T> mapper) {
         return exceptionHandler.executeWithHandling("executing SQL query for multiple results: " + sql, () -> {
             List<T> results = new ArrayList<>();
             try (Connection conn = getConnection();
@@ -1073,384 +1077,72 @@ public class SQLHandler implements AutoCloseable {
     }
 
     /**
-     * Gets player verification state
+     * Records a BlazeAndCaves achievement completion for a player
      * 
-     * @param playerUuid The player's UUID
-     * @return Optional<String> The verification state if found
+     * @param playerUuid The player's UUID as string
+     * @param achievementKey The namespaced key of the completed achievement
+     * @param bonusXP The bonus XP awarded for this achievement
      */
-    public Optional<String> getPlayerVerificationState(String playerUuid) {
-        String sql = String.format("SELECT `verification_state` FROM `%s` WHERE `UUID` = ?", tableName);
-        return executeQueryForSingleResult(sql, new Object[] { playerUuid }, rs -> rs.getString("verification_state"));
-    }
-
-    /**
-     * updateVerificationState
-     *
-     * Updates a player's verification state in the whitelist table.
-     * This method is used by the purgatory system to track player verification
-     * progress.
-     *
-     * @param playerUuid        The player's UUID as string
-     * @param verificationState The new verification state ('UNVERIFIED',
-     *                          'PURGATORY', 'VERIFIED')
-     * @return boolean true if the update was successful, false otherwise
-     */
-    public boolean updateVerificationState(String playerUuid, String verificationState) {
-        String sql = String.format("UPDATE `%s` SET `verification_state` = ? WHERE `UUID` = ?", tableName);
-
-        return exceptionHandler.executeWithHandling("updating verification state for " + playerUuid, () -> {
-            int rowsAffected = executeUpdate(sql, new Object[] { verificationState, playerUuid });
-            debugLog("Updated verification state for UUID " + playerUuid + " to " + verificationState);
-            return rowsAffected > 0;
-        }, false);
-    }
-
-    /**
-     * linkDiscordAccount
-     *
-     * Links a Discord account to a player's whitelist entry and creates an entry in
-     * the discord_data table.
-     * This method is used by the purgatory system to associate Discord accounts
-     * with Minecraft accounts.
-     *
-     * @param playerUuid      The player's UUID as string
-     * @param discordUserId   The Discord user ID
-     * @param discordUsername The Discord username
-     * @return boolean true if the linking was successful, false otherwise
-     */
-    public boolean linkDiscordAccount(String playerUuid, Long discordUserId, String discordUsername) {
-        try (Connection conn = getConnection()) {
-            // Start transaction
-            conn.setAutoCommit(false);
-
-            try {
-                // Update main whitelist table with Discord info
-                String updateWhitelistSql = String.format(
-                        "UPDATE `%s` SET `discord_id` = ?, `discord_name` = ? WHERE `UUID` = ?",
-                        tableName);
-                try (PreparedStatement stmt = conn.prepareStatement(updateWhitelistSql)) {
-                    stmt.setLong(1, discordUserId);
-                    stmt.setString(2, discordUsername);
-                    stmt.setString(3, playerUuid);
-                    stmt.executeUpdate();
-                }
-
-                // Insert or update discord_data table
-                String upsertDiscordDataSql = """
-                            INSERT INTO discord_data (uuid, discord_id, discord_username, linked_at)
-                            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                            ON DUPLICATE KEY UPDATE
-                                discord_username = VALUES(discord_username),
-                                linked_at = CURRENT_TIMESTAMP
-                        """;
-                try (PreparedStatement stmt = conn.prepareStatement(upsertDiscordDataSql)) {
-                    stmt.setString(1, playerUuid);
-                    stmt.setString(2, discordUserId.toString());
-                    stmt.setString(3, discordUsername);
-                    stmt.executeUpdate();
-                }
-
-                // Commit transaction
-                conn.commit();
-                debugLog("Successfully linked Discord account " + discordUserId + " to UUID " + playerUuid);
-                return true;
-
-            } catch (SQLException e) {
-                // Rollback transaction on error
-                conn.rollback();
-                logger.error("Error linking Discord account for UUID " + playerUuid, e);
-                return false;
-            } finally {
-                conn.setAutoCommit(true);
-            }
-        } catch (SQLException e) {
-            logger.error("Error getting database connection for Discord linking", e);
-            return false;
-        }
-    }
-
-    /**
-     * Gets player Discord ID
-     * 
-     * @param playerUuid The player's UUID
-     * @return Optional<Long> The Discord ID if found
-     */
-    public Optional<Long> getPlayerDiscordId(String playerUuid) {
-        String sql = String.format("SELECT `discord_id` FROM `%s` WHERE `UUID` = ?", tableName);
-
-        return executeQueryForSingleResult(sql, new Object[] { playerUuid }, rs -> {
-            long discordId = rs.getLong("discord_id");
-            return rs.wasNull() ? null : discordId;
-        }).filter(id -> id != null);
-    }
-
-    /**
-     * Gets player name from UUID
-     * 
-     * @param playerUuid The player's UUID
-     * @return Optional<String> The player name if found
-     */
-    public Optional<String> getPlayerNameFromUuid(String playerUuid) {
-        String sql = String.format("SELECT `user` FROM `%s` WHERE `UUID` = ?", tableName);
-        return executeQueryForSingleResult(sql, new Object[] { playerUuid }, rs -> rs.getString("user"));
-    }
-
-    /**
-     * Logs reward processing for a player
-     * 
-     * @param playerUuid    The player's UUID
-     * @param mainRank      The main rank
-     * @param subRank       The sub rank
-     * @param economyAmount The economy reward amount
-     * @param commandCount  The number of commands executed
-     */
-    public void logRewardProcessing(String playerUuid, int mainRank, int subRank,
-            int economyAmount, int commandCount) {
-        String sql = """
-                    INSERT INTO xp_events (uuid, event_type, event_source, xp_gained, metadata)
-                    VALUES (?, 'REWARD_PROCESSING', ?, ?, ?)
-                """;
-
+    public void recordAchievementCompletion(String playerUuid, String achievementKey, int bonusXP) {
+        String sql = "INSERT INTO " + tableName + "_achievements (player_uuid, achievement_key, bonus_xp, completed_at) " +
+                     "VALUES (?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE bonus_xp = VALUES(bonus_xp), completed_at = NOW()";
+        
         try (Connection conn = getConnection();
-                PreparedStatement stmt = conn.prepareStatement(sql)) {
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
             stmt.setString(1, playerUuid);
-            stmt.setString(2, String.format("Rank %d.%d", mainRank, subRank));
-            stmt.setInt(3, economyAmount);
-            stmt.setString(4, String.format("Commands executed: %d", commandCount));
+            stmt.setString(2, achievementKey);
+            stmt.setInt(3, bonusXP);
+            
             stmt.executeUpdate();
+            
+            if (debugEnabled) {
+                debugLog("Recorded achievement completion: " + achievementKey + " for player " + playerUuid + 
+                         " with " + bonusXP + " bonus XP");
+            }
+            
         } catch (SQLException e) {
-            logger.error("Error logging reward processing", e);
+            logger.error("Error recording achievement completion for player: {}", playerUuid, e);
+            exceptionHandler.handleDatabaseException("Record achievement completion", e, 
+                "Player: " + playerUuid + ", Achievement: " + achievementKey);
         }
     }
-
+    
     /**
-     * Gets player total XP from all sources
+     * Gets the count of achievements completed by a player
      * 
-     * @param playerUuid The player's UUID
-     * @return The total XP points for the player
+     * @param playerUuid The player's UUID as string
+     * @return The number of achievements completed by this player
      */
-    public int getPlayerTotalXP(String playerUuid) {
-        String sql = """
-                    SELECT COALESCE(SUM(xp_gained), 0) as total_xp
-                    FROM xp_events
-                    WHERE uuid = ? AND event_type = 'XP_GAIN'
-                """;
-
+    public int getPlayerAchievementCount(String playerUuid) {
+        String sql = "SELECT COUNT(*) FROM " + tableName + "_achievements WHERE player_uuid = ?";
+        
         try (Connection conn = getConnection();
-                PreparedStatement stmt = conn.prepareStatement(sql)) {
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
             stmt.setString(1, playerUuid);
-
+            
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
-                    return rs.getInt("total_xp");
+                    int count = rs.getInt(1);
+                    
+                    if (debugEnabled) {
+                        debugLog("Retrieved achievement count for player " + playerUuid + ": " + count);
+                    }
+                    
+                    return count;
+                } else {
+                    return 0;
                 }
             }
+            
         } catch (SQLException e) {
-            logger.error("Error getting player total XP", e);
-        }
-
-        return 0;
-    }
-
-    /**
-     * getXPEventCount
-     * 
-     * Gets the count of XP events for a player within a time range.
-     * Used for rate limiting to prevent XP farming.
-     * 
-     * @param playerUuid  The player's UUID
-     * @param eventType   The type of XP event
-     * @param eventSource The source of the XP event
-     * @param startTime   The start of the time range
-     * @param endTime     The end of the time range
-     * @return The number of XP events in the specified time range
-     * @throws SQLException if database operation fails
-     */
-    public int getXPEventCount(String playerUuid, String eventType, String eventSource,
-            Instant startTime, Instant endTime) throws SQLException {
-        String sql = """
-                    SELECT COUNT(*) as event_count
-                    FROM xp_events
-                    WHERE uuid = ? AND event_type = ? AND event_source = ?
-                    AND timestamp BETWEEN ? AND ?
-                """;
-
-        try (Connection conn = getConnection();
-                PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, playerUuid);
-            stmt.setString(2, eventType);
-            stmt.setString(3, eventSource);
-            stmt.setTimestamp(4, Timestamp.from(startTime));
-            stmt.setTimestamp(5, Timestamp.from(endTime));
-
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt("event_count");
-                }
-            }
-        }
-
-        return 0;
-    }
-
-    /**
-     * recordXPEvent
-     * 
-     * Records an XP event to the database for tracking and analytics.
-     * This method stores all XP gains with metadata for debugging and analysis.
-     * 
-     * @param playerUuid  The player's UUID
-     * @param eventType   The type of XP event (e.g., "ADVANCEMENT", "PLAYTIME")
-     * @param eventSource The specific source (e.g., advancement name,
-     *                    "playtime_tick")
-     * @param xpGained    The amount of XP gained
-     * @param timestamp   The timestamp when the event occurred
-     * @param serverName  The name of the server where the event occurred
-     * @param metadata    Additional metadata about the event
-     * @throws SQLException if database operation fails
-     */
-    public void recordXPEvent(String playerUuid, String eventType, String eventSource,
-            int xpGained, Instant timestamp, String serverName, String metadata) throws SQLException {
-        String sql = """
-                    INSERT INTO xp_events (uuid, event_type, event_source, xp_gained, timestamp, server_name, metadata)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                """;
-
-        try (Connection conn = getConnection();
-                PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, playerUuid);
-            stmt.setString(2, eventType);
-            stmt.setString(3, eventSource);
-            stmt.setInt(4, xpGained);
-            stmt.setTimestamp(5, Timestamp.from(timestamp));
-            stmt.setString(6, serverName);
-            stmt.setString(7, metadata);
-            stmt.executeUpdate();
+            logger.error("Error getting achievement count for player: {}", playerUuid, e);
+            exceptionHandler.handleDatabaseException("Get player achievement count", e, "Player: " + playerUuid);
+            return 0;
         }
     }
-
-    /**
-     * getRecentXPEvents
-     * 
-     * Gets recent XP events for a player, sorted by most recent first.
-     * 
-     * @param playerUuid The player's UUID
-     * @param limit      Maximum number of events to return
-     * @return List of XPEvent objects
-     * @throws SQLException if database operation fails
-     */
-    public java.util.List<top.jk33v3rs.velocitydiscordwhitelist.models.XPEvent> getRecentXPEvents(String playerUuid,
-            int limit) throws SQLException {
-        String sql = """
-                    SELECT uuid, event_type, event_source, xp_gained, timestamp, server_name, metadata
-                    FROM xp_events
-                    WHERE uuid = ?
-                    ORDER BY timestamp DESC
-                    LIMIT ?
-                """;
-
-        return executeQueryForMultipleResults(sql, new Object[] { playerUuid, limit }, rs -> {
-            return new top.jk33v3rs.velocitydiscordwhitelist.models.XPEvent(
-                    rs.getString("uuid"),
-                    rs.getString("event_type"),
-                    rs.getString("event_source"),
-                    rs.getInt("xp_gained"),
-                    rs.getTimestamp("timestamp").toInstant(),
-                    rs.getString("server_name"),
-                    rs.getString("metadata"));
-        });
-    }
-
-    /**
-     * getPlayerXPSince
-     * 
-     * Gets total XP gained by a player since a specific timestamp.
-     * 
-     * @param playerUuid The player's UUID
-     * @param since      The timestamp to calculate XP from
-     * @return Total XP gained since the specified time
-     * @throws SQLException if database operation fails
-     */
-    public int getPlayerXPSince(String playerUuid, Instant since) throws SQLException {
-        String sql = """
-                    SELECT COALESCE(SUM(xp_gained), 0) as total_xp
-                    FROM xp_events
-                    WHERE uuid = ? AND timestamp >= ?
-                """;
-
-        return executeQueryForSingleResult(sql, new Object[] { playerUuid, Timestamp.from(since) },
-                rs -> rs.getInt("total_xp")).orElse(0);
-    }
-
-    /**
-     * Gets player XP breakdown by source since a specific date
-     * 
-     * @param playerUuid The player's UUID
-     * @param since      The date to start from
-     * @return Map of source names to XP amounts
-     */
-    public java.util.Map<String, Integer> getPlayerXPBySource(String playerUuid, Instant since) {
-        String sql = """
-                    SELECT event_source, COALESCE(SUM(xp_gained), 0) as source_xp
-                    FROM xp_events
-                    WHERE uuid = ? AND event_type = 'XP_GAIN'
-                    AND timestamp >= ?
-                    GROUP BY event_source
-                    ORDER BY source_xp DESC
-                """;
-
-        java.util.Map<String, Integer> breakdown = new java.util.LinkedHashMap<>();
-        List<java.util.Map<String, Object>> results = executeQueryForMultipleResults(sql,
-                new Object[] { playerUuid, Timestamp.from(since) },
-                rs -> {
-                    java.util.Map<String, Object> row = new java.util.HashMap<>();
-                    row.put("source", rs.getString("event_source"));
-                    row.put("xp", rs.getInt("source_xp"));
-                    return row;
-                });
-
-        for (java.util.Map<String, Object> result : results) {
-            breakdown.put((String) result.get("source"), (Integer) result.get("xp"));
-        }
-
-        return breakdown;
-    }
-
-    /**
-     * Gets daily XP breakdown for a player over the specified number of days
-     * 
-     * @param playerUuid The player's UUID
-     * @param days       Number of days to look back
-     * @return Map of date strings to XP amounts
-     */
-    public java.util.Map<String, Integer> getDailyXPBreakdown(String playerUuid, int days) {
-        java.util.Map<String, Integer> breakdown = new java.util.LinkedHashMap<>();
-        String sql = """
-                    SELECT DATE(timestamp) as date, COALESCE(SUM(xp_gained), 0) as daily_xp
-                    FROM xp_events
-                    WHERE uuid = ? AND event_type = 'XP_GAIN'
-                    AND timestamp >= DATE_SUB(CURDATE(), INTERVAL ? DAY)
-                    GROUP BY DATE(timestamp)
-                    ORDER BY date DESC
-                """;
-
-        try (Connection conn = getConnection();
-                PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, playerUuid);
-            stmt.setInt(2, days);
-
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    breakdown.put(rs.getString("date"), rs.getInt("daily_xp"));
-                }
-            }
-        } catch (SQLException e) {
-            logger.error("Error getting daily XP breakdown", e);
-        }
-
-        return breakdown;
-    }
-
+    
     /**
      * Tests the database connection to ensure it's working
      * 
@@ -1553,5 +1245,215 @@ public class SQLHandler implements AutoCloseable {
             }
             return false;
         }
+    }
+
+    /**
+     * addPlayerToWhitelistByUsername
+     * 
+     * Adds a player to the whitelist using only their username (for admin commands).
+     * This is used when UUID is not available, such as from Discord admin commands.
+     * 
+     * @param username The Minecraft username
+     * @param adminDiscordId The Discord ID of the admin performing the action (optional)
+     * @return CompletableFuture<Boolean> true if successful
+     */
+    public CompletableFuture<Boolean> addPlayerToWhitelistByUsername(String username, String adminDiscordId) {
+        return CompletableFuture.supplyAsync(() -> {
+            String sql = String.format(
+                    "INSERT INTO `%s` (`user`, `discord_id`, `added_by`) VALUES (?, ?, ?) " +
+                            "ON DUPLICATE KEY UPDATE `user` = VALUES(`user`), `added_by` = VALUES(`added_by`)",
+                    tableName);
+
+            try (Connection conn = getConnection();
+                    PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, username);
+                stmt.setString(2, null);
+                stmt.setString(3, adminDiscordId);
+
+                int result = stmt.executeUpdate();
+                debugLog("Added player " + username + " to whitelist by admin " + adminDiscordId);
+                return result > 0;
+            } catch (SQLException e) {
+                logger.error("Error adding player to whitelist by username", e);
+                return false;
+            }
+        });
+    }
+    
+    /**
+     * removePlayerFromWhitelistByUsername
+     * 
+     * Removes a player from the whitelist using only their username (for admin commands).
+     * This is used when UUID is not available, such as from Discord admin commands.
+     * 
+     * @param username The Minecraft username
+     * @param adminDiscordId The Discord ID of the admin performing the action (optional)
+     * @return CompletableFuture<Boolean> true if successful
+     */
+    public CompletableFuture<Boolean> removePlayerFromWhitelistByUsername(String username, String adminDiscordId) {
+        return CompletableFuture.supplyAsync(() -> {
+            String sql = String.format("DELETE FROM `%s` WHERE `user` = ?", tableName);
+            
+            try (Connection conn = getConnection();
+                 PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, username);
+                
+                int result = stmt.executeUpdate();
+                if (result > 0) {
+                    debugLog("Removed player " + username + " from whitelist (admin: " + adminDiscordId + ")");
+                    return true;
+                } else {
+                    debugLog("Player " + username + " was not found in whitelist");
+                    return false;
+                }
+            } catch (SQLException e) {
+                logger.error("Error removing player {} from whitelist", username, e);
+                exceptionHandler.handleDatabaseException("Remove player from whitelist", e, "Username: " + username);
+                return false;
+            }
+        });
+    }
+
+    /**
+     * getPlayerVerificationState
+     * 
+     * Gets the verification state of a player.
+     * 
+     * @param playerUuid The player's UUID
+     * @return Optional containing verification state if found
+     */
+    public Optional<String> getPlayerVerificationState(String playerUuid) {
+        try (Connection conn = getConnection()) {
+            String sql = String.format("SELECT verification_state FROM `%s` WHERE `UUID` = ?", tableName);
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, playerUuid);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        return Optional.ofNullable(rs.getString("verification_state"));
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Error getting verification state for player {}", playerUuid, e);
+            exceptionHandler.handleDatabaseException("Get verification state", e, "UUID: " + playerUuid);
+        }
+        return Optional.empty();
+    }
+    
+    /**
+     * getPlayerNameFromUuid
+     * 
+     * Gets the player name from their UUID.
+     * 
+     * @param playerUuid The player's UUID
+     * @return Optional containing player name if found
+     */
+    public Optional<String> getPlayerNameFromUuid(String playerUuid) {
+        try (Connection conn = getConnection()) {
+            String sql = String.format("SELECT `user` FROM `%s` WHERE `UUID` = ?", tableName);
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, playerUuid);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        return Optional.ofNullable(rs.getString("user"));
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Error getting player name for UUID {}", playerUuid, e);
+            exceptionHandler.handleDatabaseException("Get player name", e, "UUID: " + playerUuid);
+        }
+        return Optional.empty();
+    }
+    
+    /**
+     * logRewardProcessing
+     * 
+     * Logs reward processing for a player rank promotion.
+     * 
+     * @param playerUuid The player's UUID
+     * @param fromMainRank The previous main rank
+     * @param fromSubRank The previous sub rank  
+     * @param toMainRank The new main rank
+     * @param toSubRank The new sub rank
+     */
+    public void logRewardProcessing(String playerUuid, int fromMainRank, int fromSubRank, int toMainRank, int toSubRank) {
+        String sql = """
+                INSERT INTO xp_events (uuid, event_type, event_source, xp_gained, metadata)
+                VALUES (?, 'REWARD_PROCESSING', 'Rank Promotion', 0, ?)
+                """;
+        
+        String metadata = String.format("Rank promotion from %d.%d to %d.%d", fromMainRank, fromSubRank, toMainRank, toSubRank);
+        executeUpdate(sql, new Object[] { playerUuid, metadata });
+        debugLog("Logged reward processing for " + playerUuid + ": " + metadata);
+    }
+
+    /**
+     * getPlayerDiscordId
+     * 
+     * Gets the Discord ID associated with a player's UUID.
+     * 
+     * @param playerUuid The player's UUID
+     * @return Optional containing Discord ID if found
+     */
+    public Optional<String> getPlayerDiscordId(String playerUuid) {
+        try (Connection conn = getConnection()) {
+            String sql = String.format("SELECT `discord_id` FROM `%s` WHERE `UUID` = ?", tableName);
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, playerUuid);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        return Optional.ofNullable(rs.getString("discord_id"));
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Error getting Discord ID for player {}", playerUuid, e);
+            exceptionHandler.handleDatabaseException("Get Discord ID", e, "UUID: " + playerUuid);
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * listWhitelistedPlayers
+     * 
+     * Gets a list of all whitelisted players, optionally filtered by search term.
+     * 
+     * @param searchTerm Optional search term to filter players (null for all)
+     * @param limit Maximum number of results to return
+     * @return List of whitelisted player usernames
+     */
+    public List<String> listWhitelistedPlayers(String searchTerm, int limit) {
+        List<String> players = new ArrayList<>();
+        try (Connection conn = getConnection()) {
+            String sql;
+            if (searchTerm != null && !searchTerm.trim().isEmpty()) {
+                sql = String.format("SELECT `user` FROM `%s` WHERE `user` LIKE ? ORDER BY `user` LIMIT ?", tableName);
+            } else {
+                sql = String.format("SELECT `user` FROM `%s` ORDER BY `user` LIMIT ?", tableName);
+            }
+            
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                if (searchTerm != null && !searchTerm.trim().isEmpty()) {
+                    stmt.setString(1, "%" + searchTerm.trim() + "%");
+                    stmt.setInt(2, limit);
+                } else {
+                    stmt.setInt(1, limit);
+                }
+                
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        String username = rs.getString("user");
+                        if (username != null) {
+                            players.add(username);
+                        }
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            logger.error("Error listing whitelisted players with search term: {}", searchTerm, e);
+            exceptionHandler.handleDatabaseException("List whitelisted players", e, "Search: " + searchTerm);
+        }
+        return players;
     }
 }

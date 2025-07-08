@@ -287,6 +287,7 @@ public class RankCommand {
      * @param eventSource The specific source
      * @return A formatted display string
      */
+    @SuppressWarnings("unused") // Helper method for future XP event formatting
     private String formatEventSource(String eventType, String eventSource) {
         return switch (eventType) {
             case "ADVANCEMENT" -> "advancement: " + eventSource.replace("minecraft:", "").replace("_", " ");
@@ -304,6 +305,7 @@ public class RankCommand {
      * @param timestamp The timestamp to format
      * @return A formatted "time ago" string (e.g., "2m ago", "1h ago")
      */
+    @SuppressWarnings("unused") // Helper method for future time formatting
     private String formatTimeAgo(java.time.Instant timestamp) {
         long seconds = java.time.Duration.between(timestamp, java.time.Instant.now()).getSeconds();
         

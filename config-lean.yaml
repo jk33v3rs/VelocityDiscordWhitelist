@@ -1,0 +1,105 @@
+# VelocityDiscordWhitelist Configuration - Lean Production Version
+# Only essential configuration keys that map to actual backend functionality
+
+# Database Configuration
+database:
+  host: "localhost"
+  port: 3306
+  database: "discord_whitelist"
+  table: "whitelist"
+  username: "root"
+  password: "password"
+
+# Discord Bot Configuration
+discord:
+  enabled: true
+  token: "YOUR_BOT_TOKEN_HERE"
+  guild_id: "123456789012345678"
+  verification_channel: "123456789012345678"
+  init_timeout: 30
+  roles:
+    admin: "987654321098765432"
+    verified: "765432109876543210"
+
+# Plugin Settings
+settings:
+  debug: false
+  use_purgatory: true
+  purgatory_server: "lobby"
+  session_timeout_minutes: 30
+  max_verification_attempts: 3
+
+# Geyser Integration (Bedrock Edition support)
+geyser:
+  enabled: false
+  prefix: "."
+
+# LuckPerms Integration
+luckperms:
+  enabled: false
+  default_group: "verified"
+
+# Rank System (32 total: 25 main + 7 sub ranks)
+ranks:
+  enabled: true
+  main_ranks:
+    - "Tourist"
+    - "Visitor" 
+    - "Newcomer"
+    - "Resident"
+    - "Settler"
+    - "Homesteader"
+    - "Citizen"
+    - "Denizen"
+    - "Regular"
+    - "Veteran"
+    - "Pathfinder"
+    - "Trailblazer"
+    - "Explorer"
+    - "Adventurer"
+    - "Wanderer"
+    - "Journeyman"
+    - "Wayfarer"
+    - "Nomad"
+    - "Pioneer"
+    - "Stalwart"
+    - "Champion"
+    - "Hero"
+    - "Legend"
+    - "Sage"
+    - "Elder"
+  sub_ranks:
+    - "Star"
+    - "Plus"
+    - "Pro"
+    - "Elite"
+    - "Premium"
+    - "Distinguished"
+    - "VIP"
+
+# XP System
+xp:
+  enabled: true
+  base_xp_per_minute: 1
+  achievement_xp_value: 10
+
+# BlazeAndCaves Achievement Integration
+blazeandcaves:
+  enabled: false
+  achievements_file: "blazeandcaves-achievements.json"
+  easy_multiplier: 1.0
+  medium_multiplier: 1.25
+  hard_multiplier: 1.5
+  insane_multiplier: 2.0
+  extreme_multiplier: 3.0
+  terralith_bonus: 0.1
+  hardcore_bonus: 0.5
+
+# Essential Messages
+messages:
+  prefix: "&8[&bWhitelist&8]&r "
+  not_whitelisted: "&cYou are not whitelisted! Join our Discord and use /mc <username> to get whitelisted."
+  purgatory_message: "Welcome! Please complete Discord verification to gain full access."
+  verification_success: "Verification successful! Welcome to the server!"
+  session_expired: "Your verification session has expired."
+  already_verified: "You are already verified on this server."

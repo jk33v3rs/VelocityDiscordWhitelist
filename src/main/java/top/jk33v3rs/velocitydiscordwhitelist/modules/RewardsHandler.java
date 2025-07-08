@@ -18,6 +18,7 @@ import top.jk33v3rs.velocitydiscordwhitelist.models.PlayerRank;
 import top.jk33v3rs.velocitydiscordwhitelist.models.RankDefinition;
 import top.jk33v3rs.velocitydiscordwhitelist.models.RankRewards;
 import top.jk33v3rs.velocitydiscordwhitelist.utils.LoggingUtils;
+import top.jk33v3rs.velocitydiscordwhitelist.discord.DiscordHandler;
 import top.jk33v3rs.velocitydiscordwhitelist.utils.ExceptionHandler;
 
 
@@ -25,7 +26,7 @@ import top.jk33v3rs.velocitydiscordwhitelist.utils.ExceptionHandler;
  * RewardsHandler manages player rank and reward operations.
  */
 public class RewardsHandler {    private final SQLHandler sqlHandler;
-    private final DiscordBotHandler discordBotHandler;
+    private final DiscordHandler discordHandler;
     private final ProxyServer server;
     private final Logger logger;
     private final boolean debugEnabled;
@@ -39,18 +40,18 @@ public class RewardsHandler {    private final SQLHandler sqlHandler;
      * Constructor for RewardsHandler
      *
      * @param sqlHandler The SQL handler for database operations
-     * @param discordBotHandler The Discord bot handler for role management
+     * @param discordHandler The Discord handler for role management
      * @param server The ProxyServer instance for command execution
      * @param logger The logger instance
      * @param debugEnabled Whether debug logging is enabled
      * @param config The main configuration map
      * @param vaultIntegration The Vault integration (can be null)
      * @param luckPermsIntegration The LuckPerms integration (can be null)
-     */    public RewardsHandler(SQLHandler sqlHandler, DiscordBotHandler discordBotHandler, ProxyServer server, Logger logger, 
+     */    public RewardsHandler(SQLHandler sqlHandler, DiscordHandler discordHandler, ProxyServer server, Logger logger, 
                          boolean debugEnabled, Map<String, Object> config, 
                          VaultIntegration vaultIntegration, LuckPermsIntegration luckPermsIntegration) {
         this.sqlHandler = sqlHandler;
-        this.discordBotHandler = discordBotHandler;
+        this.discordHandler = discordHandler;
         this.server = server;
         this.logger = logger;
         this.debugEnabled = debugEnabled;
@@ -377,7 +378,7 @@ public class RewardsHandler {    private final SQLHandler sqlHandler;
         getPlayerRank(playerUuid).thenAccept(playerRank -> {
             try {
                 // Check if the Discord guild is available through the handler
-                if (discordBotHandler.getGuild() == null) {
+                if (discordHandler.getGuild() == null) {
                     logger.error("Cannot sync roles - Discord guild is not available");
                     future.complete(false);
                     return;
@@ -400,8 +401,8 @@ public class RewardsHandler {    private final SQLHandler sqlHandler;
                 try {
                     long discordUserId = Long.parseLong(discordId);
                     
-                    // Properly delegate to DiscordBotHandler for all Discord operations
-                    CompletableFuture<Boolean> updateResult = discordBotHandler.updateMemberRoles(
+                    // Properly delegate to DiscordHandler for all Discord operations
+                    CompletableFuture<Boolean> updateResult = discordHandler.updateMemberRoles(
                         discordUserId,
                         state,
                         String.valueOf(rankDef.getDiscordRoleId())

@@ -166,6 +166,36 @@ public class BlazeAndCavesIntegration {
     }
     
     /**
+     * Calculates bonus XP for a specific achievement
+     * 
+     * @param achievementKey The namespaced key of the achievement
+     * @return The calculated bonus XP for this achievement
+     */
+    public int calculateBonusXP(String achievementKey) {
+        BlazeAndCavesAdvancement achievement = achievementMappings.get(achievementKey);
+        if (achievement == null) {
+            logger.warn("Unknown achievement key: {}", achievementKey);
+            return 0;
+        }
+        
+        // Calculate base XP from achievement difficulty
+        double baseXP = 10.0; // Base XP for any achievement
+        double difficultyMultiplier = getDifficultyMultiplier(achievement.getDifficulty());
+        
+        // Apply category bonuses
+        double categoryBonus = 1.0;
+        if (achievement.getCategory().contains("terralith")) {
+            categoryBonus += terralithBonus;
+        }
+        if (achievement.getCategory().contains("hardcore")) {
+            categoryBonus += hardcoreBonus;
+        }
+        
+        int finalXP = (int) Math.round(baseXP * difficultyMultiplier * categoryBonus);
+        return Math.max(1, finalXP); // Minimum 1 XP
+    }
+    
+    /**
      * Gets the difficulty multiplier for a given difficulty level
      * 
      * @param difficulty The difficulty level
@@ -209,6 +239,15 @@ public class BlazeAndCavesIntegration {
      * @return Number of achievements
      */
     public int getAchievementCount() {
+        return achievementMappings.size();
+    }
+    
+    /**
+     * Gets the total number of achievements available
+     * 
+     * @return Total achievement count
+     */
+    public int getTotalAchievementCount() {
         return achievementMappings.size();
     }
     

@@ -39,6 +39,8 @@ import net.kyori.adventure.text.Component;
 import top.jk33v3rs.velocitydiscordwhitelist.commands.BrigadierCommandHandler;
 import top.jk33v3rs.velocitydiscordwhitelist.config.SimpleConfigLoader;
 import top.jk33v3rs.velocitydiscordwhitelist.database.SQLHandler;
+import top.jk33v3rs.velocitydiscordwhitelist.discord.DiscordHandler;
+import top.jk33v3rs.velocitydiscordwhitelist.discord.DiscordListener;
 import top.jk33v3rs.velocitydiscordwhitelist.integrations.LuckPermsIntegration;
 import top.jk33v3rs.velocitydiscordwhitelist.integrations.VaultIntegration;
 import top.jk33v3rs.velocitydiscordwhitelist.utils.DatabaseMonitor;
@@ -63,8 +65,9 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
     private SQLHandler sqlHandler;
     private SimpleConfigLoader configLoader;
     private Map<String, Object> config;
-    private EnhancedPurgatoryManager purgatoryManager;
-    private DiscordBotHandler discordBotHandler;
+    private PurgatoryManager purgatoryManager;
+    private DiscordHandler discordHandler;
+    private DiscordListener discordListener;
     private RewardsHandler rewardsHandler;
     private XPManager xpManager;
     private BrigadierCommandHandler commandHandler;
@@ -170,7 +173,7 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
                         throw new IllegalStateException("Critical components missing: purgatoryManager or sqlHandler is null");
                     }
                     
-                    commandHandler = new BrigadierCommandHandler(server, logger, purgatoryManager, rewardsHandler, xpManager, sqlHandler, debugEnabled, exceptionHandler);
+                    commandHandler = new BrigadierCommandHandler(server, logger, rewardsHandler, xpManager, sqlHandler, debugEnabled, exceptionHandler);
                     commandHandler.registerCommands();
                     
                     logger.info("VelocityDiscordWhitelist plugin has been enabled successfully! (Parallel initialization)");
@@ -254,15 +257,15 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
             }
         }
         
-        if (discordBotHandler != null) {
+        if (discordHandler != null) {
             try {
-                discordBotHandler.shutdown();
-                logger.info("Discord bot handler shutdown completed");
+                discordHandler.shutdown();
+                logger.info("Discord handler shutdown completed");
             } catch (Exception e) {
                 if (exceptionHandler != null) {
-                    exceptionHandler.handleIntegrationException("Discord Bot", "shutdown", e);
+                    exceptionHandler.handleIntegrationException("Discord", "shutdown", e);
                 } else {
-                    logger.error("Error shutting down Discord bot", e);
+                    logger.error("Error shutting down Discord handler", e);
                 }
             }
         }
@@ -273,76 +276,82 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
         }
         
         logger.info("VelocityDiscordWhitelist plugin shutdown complete");
-    }@Subscribe
+    }    @Subscribe
     public void onPlayerLogin(LoginEvent event) {
         if (!pluginEnabled.get()) {
             return;
         }
         
         // Check if plugin is enabled in config
-        @SuppressWarnings("unchecked")
-        Map<String, Object> settingsConfig = (Map<String, Object>) config.getOrDefault("settings", new HashMap<>());
-        boolean configEnabled = Boolean.parseBoolean(settingsConfig.getOrDefault("enabled", "true").toString());
-        
+        boolean configEnabled = configLoader.get("settings.enabled", true);
         if (!configEnabled) {
             return;
         }
 
         Player player = event.getPlayer();
-        String username = player.getUsername();
         
-        // Handle Geyser/Bedrock prefix
-        String originalUsername = username;
-        
-        @SuppressWarnings("unchecked")
-        Map<String, Object> geyserConfig = (Map<String, Object>) config.getOrDefault("geyser", new HashMap<>());
-        boolean geyserEnabled = Boolean.parseBoolean(geyserConfig.getOrDefault("enabled", "false").toString());
-        
-        if (geyserEnabled) {
-            String geyserPrefix = geyserConfig.getOrDefault("prefix", ".").toString();
-            if (username.startsWith(geyserPrefix)) {
-                username = username.substring(geyserPrefix.length());
-                debugLog("Detected Bedrock player: " + originalUsername + " -> " + username);
+        // Use the new Discord verification system with simple flow
+        if (discordListener != null) {
+            try {
+                boolean allowJoin = discordListener.handlePlayerJoin(player);
+                if (allowJoin) {
+                    // Check if player is in purgatory - if so, complete verification immediately
+                    if (purgatoryManager != null && purgatoryManager.isInPurgatory(player.getUsername())) {
+                        boolean verified = purgatoryManager.completeVerificationOnJoin(player.getUsername(), player.getUniqueId());
+                        if (verified) {
+                            logger.info("Player {} completed verification and was added to whitelist", player.getUsername());
+                        } else {
+                            logger.warn("Failed to complete verification for player {}", player.getUsername());
+                        }
+                    }
+                    return; // Allow join
+                } else {
+                    // Player not whitelisted or in purgatory - deny with message
+                    event.setResult(ComponentResult.denied(Component.text("You are not whitelisted! Join our Discord and use /mc <your username> to begin verification.")));
+                    return;
+                }
+            } catch (Exception e) {
+                logger.error("Error in Discord verification system for player {}", player.getUsername(), e);
+                event.setResult(ComponentResult.denied(Component.text("Verification system error. Please try again.")));
+                return;
+            }
+        } else {
+            // Fallback to old system if Discord not available
+            String username = player.getUsername();
+            debugLog("Checking whitelist for " + username + " (Discord system unavailable)");
+            
+            try {
+                CompletableFuture<Boolean> whitelistCheck = sqlHandler.isPlayerWhitelisted(player);
+                
+                whitelistCheck
+                    .orTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+                    .whenComplete((isWhitelisted, error) -> {
+                        if (error != null) {
+                            if (error instanceof java.util.concurrent.TimeoutException) {
+                                logger.error("Database timeout checking whitelist for player: " + username);
+                                event.setResult(ComponentResult.denied(Component.text("Database timeout. Please try again in a moment.")));
+                            } else {
+                                exceptionHandler.handlePlayerException(player, "whitelist check", error, username);
+                                event.setResult(ComponentResult.denied(Component.text("An error occurred while checking the whitelist.")));
+                            }
+                            return;
+                        }
+
+                        if (!isWhitelisted) {
+                            String message = configLoader.getMessage("notWhitelisted", 
+                                "You are not whitelisted on this server. Please check Discord for whitelist instructions.");
+                            event.setResult(ComponentResult.denied(Component.text(message)));
+                            debugLog("Access denied for " + username);
+                        } else {
+                            debugLog("Player " + username + " is whitelisted, allowing login");
+                        }
+                    });
+            } catch (Exception e) {
+                exceptionHandler.handlePlayerException(player, "whitelist check initiation", e, username);
+                event.setResult(ComponentResult.denied(Component.text("An error occurred while checking the whitelist.")));
             }
         }
-
-        final String finalUsername = username;
-        debugLog("Checking whitelist for " + finalUsername);        try {
-            // Add timeout to prevent hanging on database operations
-            CompletableFuture<Boolean> whitelistCheck = sqlHandler.isPlayerWhitelisted(player);
-            
-            // Set a reasonable timeout for the operation
-            whitelistCheck
-                .orTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
-                .whenComplete((isWhitelisted, error) -> {
-                    if (error != null) {
-                        if (error instanceof java.util.concurrent.TimeoutException) {
-                            logger.error("Database timeout checking whitelist for player: " + finalUsername);
-                            event.setResult(ComponentResult.denied(Component.text("Database timeout. Please try again in a moment.")));
-                        } else {
-                            exceptionHandler.handlePlayerException(player, "whitelist check", error, finalUsername);
-                            event.setResult(ComponentResult.denied(Component.text("An error occurred while checking the whitelist.")));
-                        }
-                        return;
-                    }
-
-                    if (!isWhitelisted) {
-                        // Get messages from config
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> messagesConfig = (Map<String, Object>) config.getOrDefault("messages", new HashMap<>());
-                        String message = messagesConfig.getOrDefault("notWhitelisted", 
-                            "You are not whitelisted on this server. Please check Discord for whitelist instructions.").toString();
-                        event.setResult(ComponentResult.denied(Component.text(message)));
-                        debugLog("Access denied for " + finalUsername);
-                    } else {
-                        debugLog("Player " + finalUsername + " is whitelisted, allowing login");
-                    }
-                });
-        } catch (Exception e) {
-            exceptionHandler.handlePlayerException(player, "whitelist check initiation", e, finalUsername);
-            event.setResult(ComponentResult.denied(Component.text("An error occurred while checking the whitelist.")));
-        }
-    }    @Subscribe
+    }@Subscribe
     public void onServerPreConnect(com.velocitypowered.api.event.player.ServerPreConnectEvent event) {
         if (!pluginEnabled.get() || purgatoryManager == null) {
             return;
@@ -352,25 +361,24 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
         String username = player.getUsername();
 
         // Check if player is in purgatory
-        try {
-            Optional<EnhancedPurgatoryManager.PurgatorySession> sessionOpt = purgatoryManager.getSession(username);
+        try {            Optional<PurgatoryManager.PurgatorySession> sessionOpt = purgatoryManager.getSession(username);
             if (sessionOpt.isPresent()) {
-            EnhancedPurgatoryManager.PurgatorySession session = sessionOpt.get();
-            String targetServerName = event.getOriginalServer().getServerInfo().getName();
-            String allowedServer = session.getAllowedServer();
+                // Player is in purgatory - restrict to hub server only
+                String targetServerName = event.getOriginalServer().getServerInfo().getName();
+                String allowedServer = "hub"; // Default to hub for purgatory players
 
-            debugLog("Player " + username + " in purgatory attempting to connect to server: " + targetServerName);
-            
-            if (!targetServerName.equalsIgnoreCase(allowedServer)) {
-                debugLog("Blocking " + username + " from connecting to " + targetServerName + 
-                         " (only allowed on " + allowedServer + " while in purgatory)");
+                debugLog("Player " + username + " in purgatory attempting to connect to server: " + targetServerName);
                 
-                // Cancel the connection attempt
-                event.setResult(com.velocitypowered.api.event.player.ServerPreConnectEvent.ServerResult.denied());
-                  // Notify the player
-                player.sendMessage(Component.text(
-                    "You must complete verification before connecting to other servers. Use /verify with your code.",
-                    net.kyori.adventure.text.format.NamedTextColor.RED
+                if (!targetServerName.equalsIgnoreCase(allowedServer)) {
+                    debugLog("Blocking " + username + " from connecting to " + targetServerName + 
+                             " (only allowed on " + allowedServer + " while in purgatory)");
+                    
+                    // Cancel the connection attempt
+                    event.setResult(com.velocitypowered.api.event.player.ServerPreConnectEvent.ServerResult.denied());
+                    // Notify the player
+                    player.sendMessage(Component.text(
+                        "You must complete verification before connecting to other servers. Use /verify with your code.",
+                        net.kyori.adventure.text.format.NamedTextColor.RED
                 ));            }
             }
         } catch (Exception e) {
@@ -446,12 +454,17 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
     public Map<String, Object> getConfig() {
         return config;
     }    
-    public EnhancedPurgatoryManager getPurgatoryManager() {
+    /**
+     * Gets the purgatory manager
+     * 
+     * @return The purgatory manager, may be null if not initialized
+     */
+    public PurgatoryManager getPurgatoryManager() {
         return purgatoryManager;
     }
     
-    public DiscordBotHandler getDiscordBotHandler() {
-        return discordBotHandler;
+    public DiscordHandler getDiscordHandler() {
+        return discordHandler;
     }
     
     public RewardsHandler getRewardsHandler() {
@@ -665,7 +678,7 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
             try {
                 // Test if the whitelist table exists and is accessible
                 sqlHandler.getPlayerDiscordId("test-validation-uuid");
-                logger.info("Database connection validation successful - full functionality verified");
+                logger.info("Database connection validation successful");
                 return true;
             } catch (Exception tableEx) {
                 // Table operations failed, but connection works - might be initialization issue
@@ -827,7 +840,7 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
                     // Test basic functionality
                     try {
                         sqlHandler.getPlayerDiscordId("startup-validation-test");
-                        statusReport.append(" (Full functionality verified)\n");
+                        statusReport.append(" (Basic functionality verified)\n");
                     } catch (Exception tableEx) {
                         statusReport.append(" (Connection OK, tables pending initialization)\n");
                     }
@@ -854,13 +867,13 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
         }
         
         // Validate Optional Components
-        statusReport.append("\n=== Optional Components ===\n");        // Discord Bot Handler
+        statusReport.append("\n=== Optional Components ===\n");        // Discord Handler
         statusReport.append("Discord Bot: ");
-        if (discordBotHandler != null) {
-            if (discordBotHandler.isConnectionFailed()) {
+        if (discordHandler != null) {
+            if (discordHandler.isConnectionFailed()) {
                 statusReport.append("✗ FAILED TO CONNECT\n");
                 allCriticalComponentsReady = false;
-            } else if (discordBotHandler.getConnectionStatus()) {
+            } else if (discordHandler.getConnectionStatus()) {
                 statusReport.append("✓ INITIALIZED & CONNECTED\n");
             } else {
                 statusReport.append("(connecting...)\n");
@@ -1062,9 +1075,9 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
             healthStatus.put("purgatory", "FAILED - Not initialized");
         }
         
-        // Check Discord bot
-        if (discordBotHandler != null) {
-            if (discordBotHandler.getConnectionStatus()) {
+        // Check Discord handler
+        if (discordHandler != null) {
+            if (discordHandler.getConnectionStatus()) {
                 healthStatus.put("discord", "HEALTHY - Connected");
             } else {
                 healthStatus.put("discord", "DEGRADED - Connecting...");
@@ -1157,47 +1170,56 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
         Map<String, Object> purgatoryConfigMap = (Map<String, Object>) config.getOrDefault("purgatory", new HashMap<>());
         int purgatorySessionTimeout = Integer.parseInt(purgatoryConfigMap.getOrDefault("session_timeout_minutes", "30").toString());
         
-        purgatoryManager = new EnhancedPurgatoryManager(logger, debugEnabled, sqlHandler, purgatorySessionTimeout);
+        purgatoryManager = new PurgatoryManager(logger, sqlHandler, exceptionHandler, debugEnabled, purgatorySessionTimeout);
         logger.info("Purgatory Manager initialized successfully");
     }
     
     /**
-     * Initializes the Discord Bot Handler
-     * Depends on: config, exceptionHandler, sqlHandler, purgatoryManager
+     * Initializes the Discord integration (handler and listener)
+     * Depends on: configLoader, exceptionHandler, sqlHandler, purgatoryManager
      */
     private void initializeDiscordIntegration() {
-        if (config == null || exceptionHandler == null || sqlHandler == null) {
-            throw new IllegalStateException("Config, ExceptionHandler, and SQLHandler are required for Discord integration");
+        if (configLoader == null || exceptionHandler == null || sqlHandler == null) {
+            throw new IllegalStateException("ConfigLoader, ExceptionHandler, and SQLHandler are required for Discord integration");
         }
         try {
-            // Get the Discord config section from YAML
-            @SuppressWarnings("unchecked")
-            Map<String, Object> discordConfig = (Map<String, Object>) config.getOrDefault("discord", new HashMap<>());
             if (purgatoryManager != null) {
-                discordBotHandler = new DiscordBotHandler(purgatoryManager, sqlHandler, logger, discordConfig);
+                discordHandler = new DiscordHandler(logger, exceptionHandler, configLoader, sqlHandler, purgatoryManager, server);
+                discordListener = discordHandler.getListener();
+                
+                // Initialize Discord bot asynchronously
+                discordHandler.initializeBot().thenAccept(success -> {
+                    if (success) {
+                        // Register DiscordChat with Velocity event manager for chat integration
+                        if (discordHandler.getChat() != null) {
+                            server.getEventManager().register(this, discordHandler.getChat());
+                            logger.info("Discord chat integration registered with Velocity events");
+                        }
+                        logger.info("Discord integration initialized successfully");
+                    } else {
+                        logger.warn("Discord integration failed to connect");
+                    }
+                });
             } else {
-                logger.error("PurgatoryManager is required for DiscordBotHandler initialization. Discord bot will not start.");
-                discordBotHandler = null;
+                logger.error("PurgatoryManager is required for Discord integration. Discord will not start.");
+                discordHandler = null;
+                discordListener = null;
             }
-            logger.info("Discord Bot Handler initialized successfully");
+            logger.info("Discord Handler initialized successfully");
         } catch (Exception e) {
             logger.warn("Discord integration failed to initialize: " + e.getMessage());
-            discordBotHandler = null;
+            discordHandler = null;
+            discordListener = null;
         }
     }
 
     /**
      * Initializes the Rewards Handler
-     * Depends on: sqlHandler, server, config, and optionally vaultIntegration, luckPermsIntegration, discordBotHandler
+     * Depends on: sqlHandler, server, config, and optionally vaultIntegration, luckPermsIntegration, discordHandler
      */
     private void initializeRewardsHandler() {
-        // Use existing discordBotHandler if available, null otherwise
-        rewardsHandler = new RewardsHandler(sqlHandler, discordBotHandler, server, logger, debugEnabled, config, vaultIntegration, luckPermsIntegration);
-        
-        // Set the rewards handler in purgatory manager for verification rewards if both are available
-        if (rewardsHandler != null && purgatoryManager != null) {
-            purgatoryManager.setRewardsHandler(rewardsHandler);
-        }
+        // Pass discordHandler to RewardsHandler for Discord role management
+        rewardsHandler = new RewardsHandler(sqlHandler, discordHandler, server, logger, debugEnabled, config, vaultIntegration, luckPermsIntegration);
         
         logger.info("Rewards Handler initialized successfully");
     }

@@ -1,6 +1,5 @@
 package top.jk33v3rs.velocitydiscordwhitelist.commands;
 
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import org.slf4j.Logger;
@@ -18,16 +17,15 @@ import com.velocitypowered.api.proxy.ProxyServer;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import top.jk33v3rs.velocitydiscordwhitelist.database.SQLHandler;
-import top.jk33v3rs.velocitydiscordwhitelist.modules.EnhancedPurgatoryManager;
 import top.jk33v3rs.velocitydiscordwhitelist.modules.RewardsHandler;
 import top.jk33v3rs.velocitydiscordwhitelist.modules.XPManager;
 import top.jk33v3rs.velocitydiscordwhitelist.utils.ExceptionHandler;
 
-/** Handles Minecraft commands including /verify, /rank, /xpchart, and VWL admin commands. */
+/** Handles Minecraft commands including /rank, /xpchart, and VWL admin commands. 
+ * Note: /verify command removed - verification now happens automatically on join. */
 public class BrigadierCommandHandler {
     private final ProxyServer server;
     private final Logger logger;
-    private final EnhancedPurgatoryManager purgatoryManager;
     private final RewardsHandler rewardsHandler;
     private final XPManager xpManager;
     private final SQLHandler sqlHandler;
@@ -39,19 +37,17 @@ public class BrigadierCommandHandler {
      *
      * @param server The Velocity proxy server instance
      * @param logger The logger for logging messages
-     * @param purgatoryManager The purgatory manager for verification
      * @param rewardsHandler The rewards handler for rank management
      * @param xpManager The XP manager for experience tracking
      * @param sqlHandler The SQL handler for database operations
      * @param debugEnabled Whether debug logging is enabled
      * @param exceptionHandler The centralized exception handler
      */
-    public BrigadierCommandHandler(ProxyServer server, Logger logger, EnhancedPurgatoryManager purgatoryManager,
+    public BrigadierCommandHandler(ProxyServer server, Logger logger,
                                  RewardsHandler rewardsHandler, XPManager xpManager, SQLHandler sqlHandler, 
                                  boolean debugEnabled, ExceptionHandler exceptionHandler) {
         this.server = server;
         this.logger = logger;
-        this.purgatoryManager = purgatoryManager;
         this.rewardsHandler = rewardsHandler;
         this.xpManager = xpManager;
         this.sqlHandler = sqlHandler;
@@ -98,17 +94,12 @@ public class BrigadierCommandHandler {
     /**
      * registerCommands method
      * Registers all VWL commands with the Velocity command manager.
-     * Includes /verify, /rank, /xpchart, and VWL admin commands.
+     * Includes /rank, /xpchart, and VWL admin commands.
+     * 
+     * Note: /verify command removed - verification now happens automatically on join
      */
     public void registerCommands() {
         CommandManager commandManager = server.getCommandManager();
-
-        // Register /verify command
-        CommandMeta verifyMeta = commandManager.metaBuilder("verify")
-            .build();
-        BrigadierCommand verifyCommand = createVerifyCommand();
-        commandManager.register(verifyMeta, verifyCommand);
-        debugLog("Registered /verify command");
 
         // Register /rank command
         CommandMeta rankMeta = commandManager.metaBuilder("rank")
@@ -131,110 +122,6 @@ public class BrigadierCommandHandler {
         BrigadierCommand vwlCommand = createVWLCommand();
         commandManager.register(vwlMeta, vwlCommand);
         debugLog("Registered /vwl admin command");
-    }
-
-    /**
-     * createVerifyCommand method
-     * Creates the BrigadierCommand for the /verify command.
-     * Allows players to verify their Discord account using a code.
-     *
-     * @return The BrigadierCommand instance for /verify
-     */
-    private BrigadierCommand createVerifyCommand() {
-        LiteralCommandNode<CommandSource> verifyNode = BrigadierCommand.literalArgumentBuilder("verify")
-            .then(BrigadierCommand.requiredArgumentBuilder("code", StringArgumentType.word())
-                .executes(context -> {
-                    CommandSource source = context.getSource();
-                    String code = context.getArgument("code", String.class);
-
-                    if (source instanceof Player player) {
-                        String username = player.getUsername();
-
-                        debugLog("Player " + username + " attempting verification with code " + code);
-
-                        // Check for active session
-                        Optional<EnhancedPurgatoryManager.PurgatorySession> existingSession = purgatoryManager.getSession(username);
-                        if (existingSession.isEmpty()) {
-                            debugLog("No active session found for player " + username);
-                            source.sendMessage(Component.text("You don't have an active verification session. Please use /mc command in our Discord server to start verification.", NamedTextColor.RED));
-                            return Command.SINGLE_SUCCESS;
-                        }
-
-                        EnhancedPurgatoryManager.PurgatorySession session = existingSession.get();
-                        debugLog("Found session for " + username + " (attempts: " + session.getVerificationAttempts() + ")");
-
-                        // Check if session is expired
-                        if (session.isExpired()) {
-                            debugLog("Session expired for player " + username);
-                            source.sendMessage(Component.text("Your verification session has expired. Please use /mc in Discord to get a new code.", NamedTextColor.RED));
-                            purgatoryManager.removeSession(username);
-                            return Command.SINGLE_SUCCESS;
-                        }
-
-                        // Check if code was already used
-                        if (session.isCodeUsed()) {
-                            debugLog("Attempt to use already-used code for player " + username);
-                            source.sendMessage(Component.text("This code has already been used. Please use /mc in Discord to get a new code if needed.", NamedTextColor.RED));
-                            purgatoryManager.removeSession(username);
-                            return Command.SINGLE_SUCCESS;
-                        }
-
-                        // Validate the code
-                        boolean validCode = purgatoryManager.validateCode(username, code);
-                        
-                        if (validCode) {
-                            debugLog("Code validation successful for player " + username);
-                            
-                            // Complete verification
-                            CompletableFuture<Boolean> completionFuture = purgatoryManager.completeVerification(username, player.getUniqueId());
-                            completionFuture.thenAccept(success -> {
-                                if (success) {
-                                    source.sendMessage(Component.text("Successfully verified! You can now join the server.", NamedTextColor.GREEN));
-                                    debugLog("Player " + username + " successfully verified");
-                                    
-                                    // Check if Discord was linked
-                                    if (session.getDiscordUserId() != null) {
-                                        source.sendMessage(Component.text("Your Minecraft account has been linked to Discord account " + session.getDiscordUsername(), NamedTextColor.GREEN));
-                                        debugLog("Discord account linked: " + session.getDiscordUsername() + " (" + session.getDiscordUserId() + ")");
-                                    }
-                                } else {
-                                    source.sendMessage(Component.text("An error occurred during verification. Please try again or contact an admin.", NamedTextColor.RED));
-                                    debugLog("Failed to complete verification for player " + username);
-                                }
-                            });
-                        } else {
-                            // Handle failed validation
-                            int attemptsLeft = EnhancedPurgatoryManager.PurgatorySession.MAX_VERIFICATION_ATTEMPTS - session.getVerificationAttempts();
-                            debugLog("Validation failed for player " + username + " with code: " + code + " (" + attemptsLeft + " attempts left)");
-
-                            // Check for max attempts
-                            if (session.getVerificationAttempts() >= EnhancedPurgatoryManager.PurgatorySession.MAX_VERIFICATION_ATTEMPTS) {
-                                debugLog("Player " + username + " reached max verification attempts, removing session");
-                                source.sendMessage(Component.text("Too many failed attempts. Please use /mc to start over.", NamedTextColor.RED));
-                                purgatoryManager.removeSession(username);
-                            } else {
-                                source.sendMessage(Component.text("Invalid verification code. Please check the code and try again. (" + attemptsLeft + " attempts remaining)", NamedTextColor.RED));
-                                if (attemptsLeft <= 3) {
-                                    source.sendMessage(Component.text("Warning: After " + attemptsLeft + " more failed attempts, you'll need to start over with /mc in Discord", NamedTextColor.GOLD));
-                                }
-                            }
-                        }
-                    } else {
-                        if (source != null) {
-                            source.sendMessage(Component.text("This command can only be used by players.", NamedTextColor.RED));
-                        }
-                        return 0;
-                    }
-
-                    return Command.SINGLE_SUCCESS;
-                }))
-            .executes(context -> {
-                context.getSource().sendMessage(Component.text("Usage: /verify <code>", NamedTextColor.RED));
-                return Command.SINGLE_SUCCESS;
-            })
-            .build();
-
-        return new BrigadierCommand(verifyNode);
     }
 
     /**
