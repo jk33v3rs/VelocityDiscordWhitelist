@@ -1,0 +1,65 @@
+# Example Ranks Configuration for VelocityDiscordWhitelist v1.0.11
+# Copy this file to your plugin data directory and customize as needed
+
+# Rank System Configuration
+ranks:
+  enabled: true
+  max_rank: 175
+  
+  # Starting rank for new players
+  starting_rank: 1
+  starting_xp: 0
+  
+  # XP multipliers
+  xp_multipliers:
+    achievement: 1.0
+    activity: 1.0
+    bonus: 1.5
+    
+  # Rank rewards
+  rank_rewards:
+    enabled: true
+    broadcast_promotions: true
+    
+  # Sample rank definitions
+  definitions:
+    1:
+      name: "Newcomer"
+      xp_required: 0
+      permissions: []
+      
+    10:
+      name: "Explorer" 
+      xp_required: 1000
+      permissions:
+        - "velocitydiscordwhitelist.basic"
+        
+    25:
+      name: "Adventurer"
+      xp_required: 5000
+      permissions:
+        - "velocitydiscordwhitelist.basic"
+        - "velocitydiscordwhitelist.intermediate"
+        
+    50:
+      name: "Veteran"
+      xp_required: 15000
+      permissions:
+        - "velocitydiscordwhitelist.basic"
+        - "velocitydiscordwhitelist.intermediate"
+        - "velocitydiscordwhitelist.advanced"
+        
+    100:
+      name: "Master"
+      xp_required: 50000
+      permissions:
+        - "velocitydiscordwhitelist.basic"
+        - "velocitydiscordwhitelist.intermediate" 
+        - "velocitydiscordwhitelist.advanced"
+        - "velocitydiscordwhitelist.master"
+        
+    175:
+      name: "Legend"
+      xp_required: 175000
+      permissions:
+        - "velocitydiscordwhitelist.*"

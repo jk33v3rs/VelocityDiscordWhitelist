@@ -9,6 +9,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 
+import com.velocitypowered.api.proxy.ProxyServer;
+
 import top.jk33v3rs.velocitydiscordwhitelist.database.SQLHandler;
 import top.jk33v3rs.velocitydiscordwhitelist.integrations.LuckPermsIntegration;
 import top.jk33v3rs.velocitydiscordwhitelist.integrations.VaultIntegration;
@@ -22,10 +24,9 @@ import top.jk33v3rs.velocitydiscordwhitelist.utils.ExceptionHandler;
 /**
  * RewardsHandler manages player rank and reward operations.
  */
-public class RewardsHandler {
-
-    private final SQLHandler sqlHandler;
+public class RewardsHandler {    private final SQLHandler sqlHandler;
     private final DiscordBotHandler discordBotHandler;
+    private final ProxyServer server;
     private final Logger logger;
     private final boolean debugEnabled;
     private final ExceptionHandler exceptionHandler;
@@ -34,28 +35,27 @@ public class RewardsHandler {
     private final boolean rewardsEnabled;
     private final boolean ranksEnabled;
     private final VaultIntegration vaultIntegration;
-    private final LuckPermsIntegration luckPermsIntegration;
-    
-    /**
+      /**
      * Constructor for RewardsHandler
      *
      * @param sqlHandler The SQL handler for database operations
      * @param discordBotHandler The Discord bot handler for role management
+     * @param server The ProxyServer instance for command execution
      * @param logger The logger instance
      * @param debugEnabled Whether debug logging is enabled
      * @param config The main configuration map
      * @param vaultIntegration The Vault integration (can be null)
      * @param luckPermsIntegration The LuckPerms integration (can be null)
-     */    public RewardsHandler(SQLHandler sqlHandler, DiscordBotHandler discordBotHandler, Logger logger, 
+     */    public RewardsHandler(SQLHandler sqlHandler, DiscordBotHandler discordBotHandler, ProxyServer server, Logger logger, 
                          boolean debugEnabled, Map<String, Object> config, 
                          VaultIntegration vaultIntegration, LuckPermsIntegration luckPermsIntegration) {
         this.sqlHandler = sqlHandler;
         this.discordBotHandler = discordBotHandler;
+        this.server = server;
         this.logger = logger;
         this.debugEnabled = debugEnabled;
         this.exceptionHandler = new ExceptionHandler(logger, debugEnabled);
         this.vaultIntegration = vaultIntegration;
-        this.luckPermsIntegration = luckPermsIntegration;
         
         // Parse configuration settings
         @SuppressWarnings("unchecked")
@@ -69,7 +69,6 @@ public class RewardsHandler {
         // Initialize rank definitions after all fields are set
         initializeRankDefinitions();
     }
-    
     /**
      * initializeRankDefinitions
      * Initializes rank definitions in a way that's safe to call from constructor.
@@ -680,20 +679,17 @@ public class RewardsHandler {
         } catch (Exception e) {
             logger.error("Failed to process command rewards for " + playerName, e);
         }
-    }
-
-    /**
+    }    /**
      * Sends a command to the console for execution
      * 
      * @param command The command to execute
      */
     private void sendConsoleCommand(String command) {
         try {
-            // We use the Discord Bot handler to execute commands since it has
-            // access to the proxy server instance
-            discordBotHandler.executeConsoleCommand(command);
+            // Delegate console command execution to the main plugin via the server
+            server.getCommandManager().executeAsync(server.getConsoleCommandSource(), command);
         } catch (Exception e) {
-            logger.error("Failed to send console command: " + command, e);
+            exceptionHandler.handleIntegrationException("RewardsHandler", "console command execution: " + command, e);
         }
     }
 
@@ -750,6 +746,30 @@ public class RewardsHandler {
     private String getMainRankNameById(int mainRankId) {
         return RankDefinition.getMainRankNameById(mainRankId);
     }
+
+    /**
+     * getNextRank
+     * Returns the next RankDefinition for the given mainRank and subRank.
+     * If there is no next rank, returns null.
+     *
+     * @param mainRank The current main rank
+     * @param subRank The current sub rank
+     * @return The next RankDefinition, or null if at max rank
+     */
+    public RankDefinition getNextRank(int mainRank, int subRank) {
+        // Try next subRank in the same mainRank
+        int nextSubRankKey = (mainRank * 100) + (subRank + 1);
+        if (rankDefinitionsCache.containsKey(nextSubRankKey)) {
+            return rankDefinitionsCache.get(nextSubRankKey);
+        }
+        // Try first subRank of next mainRank
+        int nextMainRankKey = ((mainRank + 1) * 100) + 1;
+        if (rankDefinitionsCache.containsKey(nextMainRankKey)) {
+            return rankDefinitionsCache.get(nextMainRankKey);
+        }
+        // No next rank found
+        return null;
+    }
     
     /**
      * Processes rank progression rewards using Vault and LuckPerms integrations
@@ -776,186 +796,14 @@ public class RewardsHandler {
                             debugLog("Failed to give Vault economy reward to " + playerUuid);
                         }
                     })
-                    .exceptionally(ex -> {
-                        logger.error("Error giving Vault economy reward to " + playerUuid, ex);
-                        return null;
-                    });
-            }
-            
-            // Update Vault permissions if available
-            if (vaultIntegration != null && vaultIntegration.isPermissionsAvailable()) {
-                vaultIntegration.syncPlayerRankGroup(playerUuid, newMainRank, newSubRank)
-                    .thenAccept(success -> {
-                        if (success) {
-                            debugLog("Synced Vault permissions for " + playerUuid + " to rank " + newMainRank + "." + newSubRank);
-                        } else {
-                            debugLog("Failed to sync Vault permissions for " + playerUuid);
+                                .exceptionally(ex -> {
+                                    logger.error("Error giving Vault economy reward to " + playerUuid, ex);
+                                    return null;
+                                });
                         }
-                    })
-                    .exceptionally(ex -> {
-                        logger.error("Error syncing Vault permissions for " + playerUuid, ex);
-                        return null;
-                    });
-            }
-            
-            // Update LuckPerms groups if available
-            if (luckPermsIntegration != null && luckPermsIntegration.isAvailable()) {
-                // For LuckPerms we need the player's UUID as UUID type, not String
-                try {
-                    java.util.UUID uuid = java.util.UUID.fromString(playerUuid);
-                    
-                    // Get Discord roles for the player
-                    java.util.Optional<Long> discordIdOpt = sqlHandler.getPlayerDiscordId(playerUuid);
-                    if (discordIdOpt.isPresent()) {
-                        Long discordId = discordIdOpt.get();
-                        
-                        // Retrieve Discord roles from DiscordBotHandler
-                        discordBotHandler.getMemberRoles(discordId)
-                            .thenAccept(discordRoles -> {
-                                // Now sync with actual Discord roles
-                                luckPermsIntegration.syncPlayerRankGroups(uuid, newMainRank, newSubRank, discordRoles)
-                                    .thenAccept(success -> {
-                                        if (success) {
-                                            debugLog("Synced LuckPerms groups for " + playerUuid + " to rank " + newMainRank + "." + newSubRank + 
-                                                    " with Discord roles: " + discordRoles);
-                                        } else {
-                                            debugLog("Failed to sync LuckPerms groups for " + playerUuid);
-                                        }
-                                    })
-                                    .exceptionally(ex -> {
-                                        logger.error("Error syncing LuckPerms groups for " + playerUuid, ex);
-                                        return null;
-                                    });
-                            })
-                            .exceptionally(ex -> {
-                                logger.error("Error retrieving Discord roles for player " + playerUuid + 
-                                           " (Discord ID: " + discordId + ")", ex);
-                                // Fallback to empty roles set
-                                java.util.Set<String> emptyRoles = new java.util.HashSet<>();
-                                luckPermsIntegration.syncPlayerRankGroups(uuid, newMainRank, newSubRank, emptyRoles)
-                                    .thenAccept(success -> {
-                                        if (success) {
-                                            debugLog("Synced LuckPerms groups for " + playerUuid + " to rank " + newMainRank + "." + newSubRank + 
-                                                    " (fallback, no Discord roles)");
-                                        } else {
-                                            debugLog("Failed to sync LuckPerms groups for " + playerUuid);
-                                        }
-                                    })
-                                    .exceptionally(ex2 -> {
-                                        logger.error("Error syncing LuckPerms groups for " + playerUuid, ex2);
-                                        return null;
-                                    });
-                                return null;
-                            });
-                    } else {
-                        // Player doesn't have a Discord ID linked, use empty roles set
-                        logger.debug("Player " + playerUuid + " has no linked Discord account");
-                        java.util.Set<String> emptyRoles = new java.util.HashSet<>();
-                        luckPermsIntegration.syncPlayerRankGroups(uuid, newMainRank, newSubRank, emptyRoles)
-                            .thenAccept(success -> {
-                                if (success) {
-                                    debugLog("Synced LuckPerms groups for " + playerUuid + " to rank " + newMainRank + "." + newSubRank);
-                                } else {
-                                    debugLog("Failed to sync LuckPerms groups for " + playerUuid);
-                                }
-                            })
-                            .exceptionally(ex -> {
-                                logger.error("Error syncing LuckPerms groups for " + playerUuid, ex);
-                                return null;
-                            });
+                    } catch (Exception e) {
+                        logger.error("Error processing rank progression rewards for " + playerUuid, e);
                     }
-                } catch (IllegalArgumentException e) {
-                    logger.error("Invalid UUID format for LuckPerms integration: " + playerUuid, e);
                 }
             }
-            
-        } catch (Exception e) {
-            logger.error("Error processing rank progression rewards for " + playerUuid, e);
-        }
-    }
-    
-    /**
-     * Processes whitelist rewards when a player is first whitelisted
-     * 
-     * @param playerUuid The UUID of the player
-     * @return CompletableFuture that resolves to true if rewards were processed successfully
-     */
-    public CompletableFuture<Boolean> processWhitelistRewards(String playerUuid) {
-        if (!rewardsEnabled) {
-            debugLog("Rewards are disabled, skipping whitelist rewards");
-            return CompletableFuture.completedFuture(true);
-        }
-        
-        CompletableFuture<Boolean> future = new CompletableFuture<>();
-        
-        try {
-            // Use single-element arrays to allow mutation inside lambda
-            @SuppressWarnings("unchecked")
-            final CompletableFuture<Boolean>[] vaultEconomyFuture = new CompletableFuture[] { CompletableFuture.completedFuture(true) };
-            if (vaultIntegration != null && vaultIntegration.isEconomyAvailable()) {
-                vaultEconomyFuture[0] = vaultIntegration.giveWhitelistReward(playerUuid, null, null);
-            }
-            
-            @SuppressWarnings("unchecked")
-            final CompletableFuture<Boolean>[] vaultPermissionsFuture = (CompletableFuture<Boolean>[]) new CompletableFuture[1];
-            vaultPermissionsFuture[0] = CompletableFuture.completedFuture(true);
-            if (vaultIntegration != null && vaultIntegration.isPermissionsAvailable()) {
-                vaultPermissionsFuture[0] = vaultIntegration.addPlayerToGroup(playerUuid, "verified", null);
-            }
-            
-            @SuppressWarnings("unchecked")
-            final CompletableFuture<Boolean>[] luckPermsFuture = (CompletableFuture<Boolean>[]) new CompletableFuture[] { CompletableFuture.completedFuture(true) };
-            if (luckPermsIntegration != null && luckPermsIntegration.isAvailable()) {
-                try {
-                    java.util.UUID uuid = java.util.UUID.fromString(playerUuid);
-                    luckPermsFuture[0] = luckPermsIntegration.addPlayerToGroup(uuid, "verified", null);
-                } catch (IllegalArgumentException e) {
-                    logger.error("Invalid UUID format for LuckPerms integration: " + playerUuid, e);
-                    luckPermsFuture[0] = CompletableFuture.completedFuture(false);
-                }
-            }
-            
-            // Wait for all operations to complete
-            CompletableFuture.allOf(vaultEconomyFuture[0], vaultPermissionsFuture[0], luckPermsFuture[0])
-                .thenAccept(v -> {
-                    boolean success = vaultEconomyFuture[0].join() && vaultPermissionsFuture[0].join() && luckPermsFuture[0].join();
-                    if (success) {
-                        debugLog("Successfully processed whitelist rewards for " + playerUuid);
-                    } else {
-                        logger.warn("Some whitelist reward operations failed for " + playerUuid);
-                    }
-                    future.complete(success);
-                })
-                .exceptionally(ex -> {
-                    logger.error("Error processing whitelist rewards for " + playerUuid, ex);
-                    future.complete(false);
-                    return null;
-                });
-                
-        } catch (Exception e) {
-            logger.error("Error initiating whitelist rewards for " + playerUuid, e);
-            future.complete(false);
-        }
-        
-        return future;
-    }
-    
-    /**
-     * Gets the next rank for progression based on current ranks
-     * Uses the official subrank progression system (1-7: novice, apprentice, adept, master, heroic, mythic, immortal)
-     * 
-     * @param currentMainRank The current main rank
-     * @param currentSubRank The current sub rank (1-7)
-     * @return The next rank definition or null if at max rank
-     */
-    private RankDefinition getNextRank(int currentMainRank, int currentSubRank) {
-        // Use the static method from RankDefinition to calculate next rank
-        int[] nextRankArray = RankDefinition.getNextRank(currentMainRank, currentSubRank);
-        if (nextRankArray == null) {
-            return null; // At max rank
-        }
-        
-        // Get the rank definition for the next rank
-        return getRankDefinition(nextRankArray[0], nextRankArray[1]);
-    }
-}
+ 

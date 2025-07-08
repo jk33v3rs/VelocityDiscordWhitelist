@@ -11,6 +11,7 @@ import java.util.concurrent.CompletableFuture;
 
 import org.slf4j.Logger;
 
+import top.jk33v3rs.velocitydiscordwhitelist.models.RankDefinition;
 import top.jk33v3rs.velocitydiscordwhitelist.utils.ExceptionHandler;
 import top.jk33v3rs.velocitydiscordwhitelist.utils.LoggingUtils;
 
@@ -23,7 +24,7 @@ public class LuckPermsIntegration {
     private final Logger logger;
     private final boolean debugEnabled;
     private final Map<String, Object> config;
-    private final boolean enabled;
+    private boolean enabled; // Not final - can be disabled if LuckPerms unavailable
     private final ExceptionHandler exceptionHandler;
 
     /**
@@ -48,14 +49,17 @@ public class LuckPermsIntegration {
         
         if (enabled) {
             try {
+                // Check if LuckPerms is available before attempting to load
                 Class<?> luckPermsProviderClass = Class.forName("net.luckperms.api.LuckPermsProvider");
                 luckPermsInstance = luckPermsProviderClass.getMethod("get").invoke(null);
                 userManagerInstance = luckPermsInstance.getClass().getMethod("getUserManager").invoke(luckPermsInstance);
                 LoggingUtils.debugLog(logger, debugEnabled, "LuckPerms integration initialized successfully");
             } catch (ClassNotFoundException e) {
-                exceptionHandler.handleIntegrationException("LuckPerms", "initialization - classes not found", e);
+                LoggingUtils.debugLog(logger, debugEnabled, "LuckPerms classes not found, disabling integration");
+                this.enabled = false;
             } catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
                 exceptionHandler.handleIntegrationException("LuckPerms", "initialization", e);
+                this.enabled = false;
             }
         }
         
@@ -66,6 +70,20 @@ public class LuckPermsIntegration {
         LoggingUtils.debugLog(logger, debugEnabled, "LuckPermsIntegration initialized - Available: " + (enabled && luckPermsInstance != null && userManagerInstance != null));
     }
 
+    /**
+     * Checks if LuckPerms is available on the classpath
+     * 
+     * @return true if LuckPerms classes can be loaded, false otherwise
+     */
+    public static boolean isLuckPermsAvailable() {
+        try {
+            Class.forName("net.luckperms.api.LuckPermsProvider");
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
+    
     /**
      * isAvailable Method
      * 
@@ -388,33 +406,36 @@ public class LuckPermsIntegration {
                 return true;
             }, false);
         });
-    }
-
-    /**
+    }    /**
      * Calculates the target groups for a player based on their rank and Discord roles
+     * UNIFIED RANK SYSTEM: Uses canonical rank names directly - no translations!
      * 
-     * @param mainRank The main rank level
-     * @param subRank The sub rank level
+     * @param mainRank The main rank level (numeric for legacy support)
+     * @param subRank The sub rank level (numeric for legacy support)
      * @param discordRoles Set of Discord role names
      * @param luckPermsConfig The LuckPerms configuration
-     * @return Set of group names the player should have
-     */
-    @SuppressWarnings("unchecked")
+     * @return Set of group names the player should have (using canonical rank names)
+     */    @SuppressWarnings("unchecked")
     private Set<String> calculateTargetGroups(int mainRank, int subRank, Set<String> discordRoles, Map<String, Object> luckPermsConfig) {
         Set<String> targetGroups = new HashSet<>();
         
-        Map<String, Object> rankMappings = (Map<String, Object>) luckPermsConfig.getOrDefault("rank_mappings", Map.of());
-        Map<String, Object> discordMappings = (Map<String, Object>) luckPermsConfig.getOrDefault("discord_mappings", Map.of());
-        
-        // Add rank-based groups
-        String rankKey = mainRank + "." + subRank;
-        if (rankMappings.containsKey(rankKey)) {
-            targetGroups.add(rankMappings.get(rankKey).toString());
-        } else if (rankMappings.containsKey(String.valueOf(mainRank))) {
-            targetGroups.add(rankMappings.get(String.valueOf(mainRank)).toString());
+        // Use the unified rank system - full canonical format "subrank mainrank"
+        String canonicalRankName = RankDefinition.formatRankDisplay(subRank, mainRank);
+        if (!"unknown rank".equals(canonicalRankName)) {
+            targetGroups.add(canonicalRankName);
         }
         
-        // Add Discord role-based groups
+        // Add Discord role-based groups - these should map directly to canonical names
+        Map<String, Object> discordRoleMappings = (Map<String, Object>) luckPermsConfig.getOrDefault("discord_role_mappings", Map.of());
+        for (String discordRole : discordRoles) {
+            if (discordRoleMappings.containsKey(discordRole)) {
+                String mappedGroup = discordRoleMappings.get(discordRole).toString();
+                targetGroups.add(mappedGroup);
+            }
+        }
+        
+        // Add special Discord user mappings
+        Map<String, Object> discordMappings = (Map<String, Object>) luckPermsConfig.getOrDefault("discord_mappings", Map.of());
         for (String discordRole : discordRoles) {
             if (discordMappings.containsKey(discordRole)) {
                 targetGroups.add(discordMappings.get(discordRole).toString());
@@ -427,6 +448,7 @@ public class LuckPermsIntegration {
         
         return targetGroups;
     }
+  
 
     /**
      * Checks if a group is managed by this plugin
@@ -464,5 +486,123 @@ public class LuckPermsIntegration {
                 return Integer.compare(p1, p2);
             })
             .orElse(null);
+    }
+
+    /**
+     * Updates a player's LuckPerms groups based on their current rank
+     * 
+     * @param playerUuid The UUID of the player
+     * @param mainRank The player's main rank (e.g., "bystander", "deity")
+     * @param subRank The player's sub-rank (e.g., "novice", "immortal")
+     * @return CompletableFuture that completes when the groups are updated
+     */
+    public CompletableFuture<Boolean> updatePlayerRankGroups(UUID playerUuid, String mainRank, String subRank) {
+        if (!isAvailable()) {
+            return CompletableFuture.completedFuture(false);
+        }
+        
+        return loadUser(playerUuid).thenCompose(userOpt -> {
+            if (userOpt.isEmpty()) {
+                logger.warn("Failed to load user {} for rank group update", playerUuid);
+                return CompletableFuture.completedFuture(false);
+            }
+            
+            try {
+                Object user = userOpt.get();
+                
+                // Determine the primary group based on main rank
+                String primaryGroup = mapMainRankToGroup(mainRank);
+                
+                // Clear existing rank-based groups and set the new primary group
+                return updateUserGroups(user, Set.of(primaryGroup), primaryGroup)
+                    .thenApply(success -> {
+                        if (success) {
+                            logger.debug("Updated LuckPerms groups for player {} to rank {}.{}", 
+                                playerUuid, mainRank, subRank);
+                        }
+                        return success;
+                    });
+                
+            } catch (Exception e) {
+                exceptionHandler.handleIntegrationException("LuckPerms", "rank group update", e);
+                return CompletableFuture.completedFuture(false);
+            }
+        });
+    }
+    
+    /**
+     * Maps a main rank to the corresponding LuckPerms group
+     * 
+     * @param mainRank The main rank from the correct rank system
+     * @return The LuckPerms group name to assign
+     */
+    @SuppressWarnings("unchecked")
+    private String mapMainRankToGroup(String mainRank) {
+        Map<String, Object> luckPermsConfig = (Map<String, Object>) config.getOrDefault("luckperms", Map.of());
+        Map<String, Object> rankMappings = (Map<String, Object>) luckPermsConfig.getOrDefault("rank_mappings", Map.of());
+        
+        // First check if there's a direct mapping
+        if (rankMappings.containsKey(mainRank)) {
+            return rankMappings.get(mainRank).toString();
+        }
+        
+        // Use the main rank as the group name (most common case)
+        return mainRank;
+    }
+    
+    /**
+     * Gets the rank-based permission level for a main rank
+     * Used for permission assignment based on rank progression
+     * 
+     * @param mainRank The main rank to evaluate
+     * @return Permission level (0-4) where higher numbers = more permissions
+     */
+    public int getRankPermissionLevel(String mainRank) {
+        // Define permission tiers based on the 25 main ranks
+        return switch (mainRank.toLowerCase()) {
+            case "bystander", "onlooker", "wanderer", "traveller", "explorer" -> 0;        // Ranks 1-5: Basic
+            case "adventurer", "surveyor", "navigator", "journeyman", "pathfinder" -> 1;   // Ranks 6-10: Trusted
+            case "trailblazer", "pioneer", "craftsman", "specialist", "artisan" -> 2;      // Ranks 11-15: Advanced
+            case "veteran", "sage", "luminary", "titan" -> 3;                              // Ranks 16-19: Expert
+            case "legend", "eternal", "ascendant", "celestial", "divine", "deity" -> 4;   // Ranks 20-25: Legendary
+            default -> 0; // Default to basic permissions
+        };
+    }
+
+    /**
+     * updateUserGroups Method
+     * Updates the groups of a user in LuckPerms
+     * 
+     * @param user The user object
+     * @param targetGroups The target groups to set
+     * @param primaryGroup The primary group to assign
+     * @return CompletableFuture that resolves to true if successful
+     */    private CompletableFuture<Boolean> updateUserGroups(Object user, Set<String> targetGroups, String primaryGroup) {
+        try {
+            // Get current groups
+            Set<String> currentGroups = getPlayerGroups((UUID) user.getClass().getMethod("getUniqueId").invoke(user)).join();
+            
+            // Remove groups no longer assigned
+            for (String group : currentGroups) {
+                if (!targetGroups.contains(group)) {
+                    removePlayerFromGroup((UUID) user.getClass().getMethod("getUniqueId").invoke(user), group, null).join();
+                }
+            }
+            
+            // Add new groups
+            for (String group : targetGroups) {
+                if (!currentGroups.contains(group)) {
+                    addPlayerToGroup((UUID) user.getClass().getMethod("getUniqueId").invoke(user), group, null).join();
+                }
+            }
+            
+            // Set primary group
+            setPlayerPrimaryGroup((UUID) user.getClass().getMethod("getUniqueId").invoke(user), primaryGroup).join();
+            
+            return CompletableFuture.completedFuture(true);
+        } catch (Exception e) {
+            exceptionHandler.handleIntegrationException("LuckPerms", "update user groups", e);
+            return CompletableFuture.completedFuture(false);
+        }
     }
 }

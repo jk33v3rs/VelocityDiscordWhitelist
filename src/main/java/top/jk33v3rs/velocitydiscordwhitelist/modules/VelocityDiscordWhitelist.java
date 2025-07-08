@@ -1,6 +1,6 @@
 // VelocityDiscordWhitelist - MIT License
 
-// VelocityDiscordWhitelist v1.0.2
+// VelocityDiscordWhitelist v1.0.11
 // Author: jk33v3rs based on the plugin VelocityWhitelist by Rathinosk
 // Portions of code used are used under MIT licence
 // DISCLAIMER: AI tools were used in the IDE used to create this plugin, which included direct (but supervised) access to code
@@ -8,22 +8,21 @@
 
 package top.jk33v3rs.velocitydiscordwhitelist.modules;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.bstats.velocity.Metrics;
 
-import com.google.gson.JsonObject;
+
 import com.google.inject.Inject;
 import com.velocitypowered.api.event.ResultedEvent.ComponentResult;
 import com.velocitypowered.api.event.Subscribe;
@@ -38,11 +37,11 @@ import com.velocitypowered.api.scheduler.ScheduledTask;
 
 import net.kyori.adventure.text.Component;
 import top.jk33v3rs.velocitydiscordwhitelist.commands.BrigadierCommandHandler;
-import top.jk33v3rs.velocitydiscordwhitelist.config.JsonConfigLoader;
-import top.jk33v3rs.velocitydiscordwhitelist.config.YamlConfigLoader;
+import top.jk33v3rs.velocitydiscordwhitelist.config.SimpleConfigLoader;
 import top.jk33v3rs.velocitydiscordwhitelist.database.SQLHandler;
 import top.jk33v3rs.velocitydiscordwhitelist.integrations.LuckPermsIntegration;
 import top.jk33v3rs.velocitydiscordwhitelist.integrations.VaultIntegration;
+import top.jk33v3rs.velocitydiscordwhitelist.utils.DatabaseMonitor;
 import top.jk33v3rs.velocitydiscordwhitelist.utils.ExceptionHandler;
 import top.jk33v3rs.velocitydiscordwhitelist.utils.LoggingUtils;
 
@@ -50,7 +49,7 @@ import top.jk33v3rs.velocitydiscordwhitelist.utils.LoggingUtils;
 @Plugin(
         id = "velocitydiscordwhitelist",
         name = "VelocityDiscordWhitelist",
-        version = "1.0.5",
+        version = "1.0.11",
         url = "https://github.com/jk33v3rs/VelocityDiscordWhitelist",
         description = "A whitelist plugin for Velocity that integrates with Discord",
         authors = {"jk33v3rs"}
@@ -60,27 +59,28 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
     private final Path dataDirectory;
     private final Path configFile;
     @SuppressWarnings("unused") // Keep for future use with metrics
-    private final Metrics.Factory metricsFactory;// Components
+    private final Metrics.Factory metricsFactory;    // Components
     private SQLHandler sqlHandler;
-    private YamlConfigLoader configLoader;
+    private SimpleConfigLoader configLoader;
     private Map<String, Object> config;
-    private JsonConfigLoader jsonConfigLoader;
     private EnhancedPurgatoryManager purgatoryManager;
     private DiscordBotHandler discordBotHandler;
     private RewardsHandler rewardsHandler;
     private XPManager xpManager;
-    private BrigadierCommandHandler commandHandler;    private VaultIntegration vaultIntegration;
+    private BrigadierCommandHandler commandHandler;
+    private VaultIntegration vaultIntegration;
     private LuckPermsIntegration luckPermsIntegration;
+    private DatabaseMonitor databaseMonitor;
     private ScheduledTask purgatoryCleanupTask;
     private ExceptionHandler exceptionHandler;
+    
+    // Parallel initialization executor
+    private ExecutorService initializationExecutor;
     
     // Configuration
     private final AtomicBoolean pluginEnabled = new AtomicBoolean(false);
     private Boolean debugEnabled = false;
     private int sessionTimeoutMinutes = 30; // Default value
-      // JSON configurations
-    private JsonObject ranksConfig;
-    private JsonObject rewardsConfig;
     
     @Inject
     public VelocityDiscordWhitelist(
@@ -97,22 +97,35 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
     }    /**
      * Event listener for the ProxyInitializeEvent.
      * This method is called when the proxy server is initialized.
-     * It registers commands, loads the configuration, and initializes database.
+     * Uses parallel initialization to improve startup performance while maintaining proper dependency order.
      *
      * @param event The ProxyInitializeEvent.
-     */    @Subscribe
+     */
+    @Subscribe
     public void onProxyInitialization(ProxyInitializeEvent event) {
+        // Create executor for parallel initialization
+        initializationExecutor = Executors.newCachedThreadPool(r -> {
+            Thread t = new Thread(r, "VelocityDiscordWhitelist-Init");
+            t.setDaemon(true);
+            return t;
+        });
+        
         try {
-            // Initialize exception handler first for proper error handling during startup
+            // Phase 1: Initialize critical sequential dependencies
+            logger.info("Starting VelocityDiscordWhitelist initialization (parallel mode)...");
+            
+            // Initialize exception handler first (no dependencies)
             this.exceptionHandler = new ExceptionHandler(logger, false); // Will be updated after config loads
             
-            // Perform startup validation
+            // Perform startup validation (sequential - needed before proceeding)
             if (!performStartupValidation()) {
                 exceptionHandler.handleIntegrationException("Plugin", "startup validation failed", 
                     new IllegalStateException("Critical startup validation failed"));
                 return;
             }
-              loadConfig();
+            
+            // Load configuration (sequential - needed by most other components)
+            loadConfig();
             
             // Validate configuration before proceeding
             if (!validateConfiguration()) {
@@ -124,22 +137,30 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
             // Update exception handler with actual debug setting
             this.exceptionHandler = new ExceptionHandler(logger, debugEnabled);
             
+            // Phase 2: Initialize database (sequential - critical dependency)
             initializeDatabase();
-              // Validate database connection
+            
+            // Validate database connection before parallel initialization
             if (!validateDatabaseConnection()) {
                 exceptionHandler.handleDatabaseException("connection validation", 
                     new SQLException("Database connection validation failed"), "Startup validation");
                 return;
             }
             
-            // Initialize integration handlers with proper error handling
-            initializeIntegrations();
+            // Phase 3: Start parallel initialization of independent components
+            CompletableFuture<Void> parallelInitialization = initializeComponentsInParallel();
             
-            // Initialize core components with validation
-            initializeCoreComponents();
+            // Wait for parallel initialization to complete with timeout
+            try {
+                parallelInitialization.get(30, TimeUnit.SECONDS);
+                logger.info("Parallel component initialization completed successfully");
+            } catch (Exception e) {
+                exceptionHandler.handleIntegrationException("Plugin", "parallel initialization timeout/failure", e);
+                pluginEnabled.set(false);
+                return;
+            }
             
-            // Initialize Discord bot handler if enabled
-            initializeDiscordIntegration();            // Validate all components before enabling the plugin
+            // Phase 4: Validate all components and finalize startup
             boolean startupSuccessful = validateStartupComponents();
             
             if (startupSuccessful) {
@@ -152,22 +173,22 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
                     commandHandler = new BrigadierCommandHandler(server, logger, purgatoryManager, rewardsHandler, xpManager, sqlHandler, debugEnabled, exceptionHandler);
                     commandHandler.registerCommands();
                     
-                    // Register event listeners
-                    server.getEventManager().register(this, this);
-                    
-                    logger.info("VelocityDiscordWhitelist plugin has been enabled successfully!");
+                    logger.info("VelocityDiscordWhitelist plugin has been enabled successfully! (Parallel initialization)");
+                    pluginEnabled.set(true);
                 } catch (Exception e) {
                     exceptionHandler.handleIntegrationException("CommandHandler", "registration", e);
                     startupSuccessful = false;
                 }
             }
-              if (!startupSuccessful) {
+            
+            if (!startupSuccessful) {
                 exceptionHandler.handleIntegrationException("Plugin", "startup completion", 
                     new IllegalStateException("Critical component failures detected during startup"));
                 pluginEnabled.set(false);
                 // Don't throw exception to prevent Velocity from crashing, but plugin will be disabled
             }
-              } catch (Exception e) {
+            
+        } catch (Exception e) {
             if (exceptionHandler != null) {
                 exceptionHandler.handleIntegrationException("Plugin", "initialization", e);
             } else {
@@ -175,10 +196,50 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
                 logger.error("Critical error during plugin initialization (ExceptionHandler unavailable)", e);
             }
             pluginEnabled.set(false);
+        } finally {
+            // Shutdown the initialization executor
+            if (initializationExecutor != null) {
+                initializationExecutor.shutdown();
+                try {
+                    if (!initializationExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                        initializationExecutor.shutdownNow();
+                    }
+                } catch (InterruptedException e) {
+                    initializationExecutor.shutdownNow();
+                    Thread.currentThread().interrupt();
+                }
+            }
         }
     }    @Subscribe
     public void onProxyShutdown(ProxyShutdownEvent event) {
         logger.info("VelocityDiscordWhitelist plugin is shutting down...");
+        
+        // Shutdown initialization executor if still running
+        if (initializationExecutor != null && !initializationExecutor.isShutdown()) {
+            try {
+                initializationExecutor.shutdown();
+                if (!initializationExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                    initializationExecutor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                initializationExecutor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
+        
+        // Stop database monitoring first
+        if (databaseMonitor != null) {
+            try {
+                databaseMonitor.shutdown();
+                logger.info("Database monitor shutdown completed");
+            } catch (Exception e) {
+                if (exceptionHandler != null) {
+                    exceptionHandler.handleIntegrationException("DatabaseMonitor", "shutdown", e);
+                } else {
+                    logger.error("Error shutting down database monitor", e);
+                }
+            }
+        }
         
         if (sqlHandler != null) {
             try {
@@ -195,8 +256,8 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
         
         if (discordBotHandler != null) {
             try {
-                // Discord bot will shutdown automatically with JDA
-                logger.info("Discord bot handler shutdown");
+                discordBotHandler.shutdown();
+                logger.info("Discord bot handler shutdown completed");
             } catch (Exception e) {
                 if (exceptionHandler != null) {
                     exceptionHandler.handleIntegrationException("Discord Bot", "shutdown", e);
@@ -316,97 +377,62 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
             exceptionHandler.handlePlayerException(player, "purgatory check", e, username);
             logger.warn("Error checking purgatory status for player: " + username, e);
         }
-    }@SuppressWarnings("UnnecessaryTemporary")  
+    }    @SuppressWarnings("UnnecessaryTemporary")  
     public boolean reloadConfig() {
         try {
-            config = loadConfig();
-              // Refresh debug mode from settings
-            @SuppressWarnings("unchecked")
-            Map<String, Object> settingsConfig = (Map<String, Object>) config.getOrDefault("settings", new HashMap<>());
-            if (settingsConfig.containsKey("debug")) {
-                String debugValueStr = settingsConfig.get("debug").toString();
-                debugEnabled = Boolean.parseBoolean(debugValueStr);
+            // Use the simple config loader to reload
+            if (configLoader != null && configLoader.reload()) {
+                config = configLoader.getConfiguration();
+                
+                // Refresh debug mode from simplified settings
+                debugEnabled = configLoader.get("settings.debug", false);
                 logger.info("Debug mode is now {}", debugEnabled ? "enabled" : "disabled");
-            }
-            
-            // Refresh session timeout
-            @SuppressWarnings("unchecked")
-            Map<String, Object> sessionConfig = (Map<String, Object>) config.getOrDefault("session", new HashMap<>());
-            if (sessionConfig.containsKey("timeout")) {
-                sessionTimeoutMinutes = Integer.parseInt(sessionConfig.get("timeout").toString());
+                
+                // Refresh session timeout
+                sessionTimeoutMinutes = configLoader.get("settings.session_timeout_minutes", 30);
                 logger.info("Verification session timeout set to {} minutes", sessionTimeoutMinutes);
+                
+                return true;
+            } else {
+                // Fallback to full reload
+                config = loadConfig();
+                return true;
             }
-            
-            // Reload JSON configurations
-            ranksConfig = jsonConfigLoader.loadConfig("ranks", JsonConfigLoader.getDefaultRanksConfig());
-            rewardsConfig = jsonConfigLoader.loadConfig("rewards", JsonConfigLoader.getDefaultRewardsConfig());
-            
-            // Refresh rewards handler data
-            if (rewardsHandler != null) {
-                rewardsHandler.loadRankDefinitions();
+        } catch (Exception e) {
+            logger.error("Failed to reload configuration", e);
+            if (exceptionHandler != null) {
+                exceptionHandler.handleIntegrationException("Configuration", "reload error", e);
             }
-            
-            return true;        } catch (NumberFormatException e) {
-            exceptionHandler.handleIntegrationException("Configuration", "reload - parsing error", e);
             return false;
         }
-    }/**
-     * Saves the default configuration file if it doesn't exist
-     */
-    private void saveDefaultConfig() {
-        try {
-            Path yamlConfigFile = dataDirectory.resolve("config.yaml");
-            Files.createDirectories(dataDirectory);
-            if (!Files.exists(yamlConfigFile)) {
-                try (InputStream in = getClass().getClassLoader().getResourceAsStream("config.yaml");
-                     OutputStream out = Files.newOutputStream(yamlConfigFile)) {
-                    if (in == null) {
-                        logger.error("Default config.yaml not found in resources");
-                    } else {
-                        // Copy from resource
-                        byte[] buffer = new byte[8192];
-                        int read;
-                        while ((read = in.read(buffer)) > 0) {
-                            out.write(buffer, 0, read);
-                        }
-                        logger.info("Default config.yaml created.");
-                    }
-                }
-            }
-        } catch (IOException e) {
-            logger.error("Error saving default configuration", e);
-        }
-    }    /**
-     * loadConfig     * Loads the configuration from the YAML file and sets up default values.
+    }
+
+    /**
+     * loadConfig
+     * 
+     * Loads the configuration using the simplified SimpleConfigLoader approach.
+     * No more complex JSON files or multiple YAML files - just simple config.yml and messages.yml.
+     * 
      * @return Map containing the loaded configuration settings.
      */
-    @SuppressWarnings("UnnecessaryTemporary")
     private Map<String, Object> loadConfig() {
         try {
-            Path yamlConfigFile = dataDirectory.resolve("config.yaml");
-            if (Files.exists(yamlConfigFile)) {
-                configLoader = new YamlConfigLoader(logger, dataDirectory);
-                config = configLoader.loadConfig("config");
-            } else {
-                saveDefaultConfig();
-                configLoader = new YamlConfigLoader(logger, dataDirectory);
-                config = configLoader.loadConfig("config");
-            }            
-            // Parse debug setting properly from settings section
-            @SuppressWarnings("unchecked")
-            Map<String, Object> settingsConfig = (Map<String, Object>) config.getOrDefault("settings", new HashMap<>());
-            String debugValueStr = settingsConfig.getOrDefault("debug", "false").toString();
-            debugEnabled = Boolean.parseBoolean(debugValueStr);
+            // Initialize the simple config loader
+            configLoader = new SimpleConfigLoader(logger, dataDirectory);
             
-            // Initialize JSON config loader
-            jsonConfigLoader = new JsonConfigLoader(logger, dataDirectory);
+            // Load configuration (creates defaults if needed)
+            config = configLoader.loadConfiguration();
             
-            // Load JSON configurations
-            ranksConfig = jsonConfigLoader.loadConfig("ranks", JsonConfigLoader.getDefaultRanksConfig());
-            rewardsConfig = jsonConfigLoader.loadConfig("rewards", JsonConfigLoader.getDefaultRewardsConfig());
+            // Parse debug setting from the simplified config
+            debugEnabled = configLoader.get("settings.debug", false);
+            
+            // Get session timeout
+            sessionTimeoutMinutes = configLoader.get("settings.session_timeout_minutes", 30);
             
             pluginEnabled.set(true);
+            logger.info("Configuration loaded successfully using SimpleConfigLoader");
             return config;
+            
         } catch (RuntimeException e) {
             logger.error("Error loading configuration", e);
             return new HashMap<>();
@@ -430,14 +456,6 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
     
     public RewardsHandler getRewardsHandler() {
         return rewardsHandler;
-    }
-    
-    public JsonObject getRanksConfig() {
-        return ranksConfig;
-    }
-      
-    public JsonObject getRewardsConfig() {
-        return rewardsConfig;
     }
     
     public VaultIntegration getVaultIntegration() {
@@ -570,6 +588,37 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
     }
     
     /**
+     * Initializes the database monitor for automatic connection health checking
+     * 
+     * This method sets up monitoring after database initialization to ensure
+     * continuous database connectivity and automatic reconnection attempts.
+     */
+    private void initializeDatabaseMonitor() {
+        if (sqlHandler == null) {
+            logger.warn("Cannot initialize database monitor - SQLHandler is null");
+            return;
+        }
+        
+        // Get configuration for database monitoring
+        @SuppressWarnings("unchecked")
+        Map<String, Object> databaseConfig = (Map<String, Object>) config.getOrDefault("database", new HashMap<>());
+        
+        // Default values for monitoring configuration
+        int retryIntervalSeconds = Integer.parseInt(databaseConfig.getOrDefault("monitorIntervalSeconds", "60").toString());
+        int maxRetryAttempts = Integer.parseInt(databaseConfig.getOrDefault("maxRetryAttempts", "10").toString());
+        
+        try {
+            databaseMonitor = new DatabaseMonitor(logger, sqlHandler, retryIntervalSeconds, maxRetryAttempts);
+            databaseMonitor.startMonitoring();
+            logger.info("Database monitor initialized and started (interval: {}s, max attempts: {})", 
+                       retryIntervalSeconds, maxRetryAttempts);
+        } catch (Exception e) {
+            exceptionHandler.handleIntegrationException("DatabaseMonitor", "initialization", e);
+            logger.warn("Database monitor could not be started - automatic reconnection will not be available");
+        }
+    }
+    
+    /**
      * Performs startup validation to ensure required dependencies and environment are available
      * 
      * @return true if validation passes, false otherwise
@@ -593,9 +642,8 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
             logger.error("Startup validation failed", e);
             return false;
         }
-    }
-      /**
-     * Validates database connection by attempting a simple connection test
+    }    /**
+     * Validates database connection by attempting a comprehensive connection test
      * 
      * @return true if database connection is valid, false otherwise
      */
@@ -606,144 +654,127 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
         }
         
         try {
+            // Test basic connection
             boolean connectionValid = sqlHandler.testConnection();
-            if (connectionValid) {
-                logger.info("Database connection validation successful");
-            } else {
-                logger.error("Database connection validation failed");
+            if (!connectionValid) {
+                logger.error("Database connection test failed - connection invalid");
+                return false;
             }
-            return connectionValid;
+            
+            // Test if we can perform basic operations
+            try {
+                // Test if the whitelist table exists and is accessible
+                sqlHandler.getPlayerDiscordId("test-validation-uuid");
+                logger.info("Database connection validation successful - full functionality verified");
+                return true;
+            } catch (Exception tableEx) {
+                // Table operations failed, but connection works - might be initialization issue
+                logger.warn("Database connected but table operations failed: {}", tableEx.getMessage());
+                logger.info("Database connection validation successful - connection valid (table access pending)");
+                return true; // Return true since connection itself is valid
+            }
+            
         } catch (Exception e) {
-            logger.error("Database connection validation failed with exception", e);
+            logger.error("Database connection validation failed with exception: {}", e.getMessage());
+            if (exceptionHandler != null) {
+                exceptionHandler.handleDatabaseException("connection validation", e, 
+                    "Failed to validate database connection during startup");
+            }
             return false;
         }
     }
     
     /**
-     * Initializes integration handlers with proper error handling
+     * Initializes components in parallel to improve startup performance.
+     * This method coordinates the parallel initialization of independent components
+     * while respecting dependency requirements.
+     * 
+     * @return CompletableFuture that completes when all parallel initialization is done
      */
-    private void initializeIntegrations() {
-        // Initialize Vault integration
-        try {
-            vaultIntegration = new VaultIntegration(server, logger, debugEnabled, config);
-            logger.info("Vault integration initialized successfully");
-        } catch (NoClassDefFoundError e) {
-            logger.info("Vault not found, economy features will be disabled");
-            vaultIntegration = null;
-        } catch (Exception e) {
-            exceptionHandler.handleIntegrationException("Vault", "initialization", e);
-            vaultIntegration = null;
-        }
-        
-        // Initialize LuckPerms integration
-        try {
-            luckPermsIntegration = new LuckPermsIntegration(logger, debugEnabled, config);
-            logger.info("LuckPerms integration initialized successfully");
-        } catch (NoClassDefFoundError e) {
-            logger.info("LuckPerms not found, permission features will be disabled");
-            luckPermsIntegration = null;
-        } catch (Exception e) {
-            exceptionHandler.handleIntegrationException("LuckPerms", "initialization", e);
-            luckPermsIntegration = null;
-        }
-    }
-    
-    /**
-     * Initializes core plugin components
-     */
-    private void initializeCoreComponents() {
-        try {            // Initialize XP Manager
-            if (sqlHandler != null) {
-                xpManager = new XPManager(sqlHandler, logger, debugEnabled, config, exceptionHandler);
-                logger.info("XP Manager initialized successfully");
-            } else {
-                throw new IllegalStateException("SQLHandler is required for XPManager");
-            }
-            
-            // Initialize Rewards Handler
-            if (discordBotHandler != null) {
-                rewardsHandler = new RewardsHandler(sqlHandler, discordBotHandler, logger, debugEnabled, config, vaultIntegration, luckPermsIntegration);
-            } else {
-                rewardsHandler = new RewardsHandler(sqlHandler, null, logger, debugEnabled, config, vaultIntegration, luckPermsIntegration);
-            }
-            logger.info("Rewards Handler initialized successfully");
-            
-            // Initialize Purgatory Manager
-            @SuppressWarnings("unchecked")
-            Map<String, Object> purgatoryConfigMap = (Map<String, Object>) config.getOrDefault("purgatory", new HashMap<>());
-            int purgatorySessionTimeout = Integer.parseInt(purgatoryConfigMap.getOrDefault("session_timeout_minutes", "30").toString());            purgatoryManager = new EnhancedPurgatoryManager(logger, debugEnabled, sqlHandler, purgatorySessionTimeout);
-            
-            // Set the rewards handler in purgatory manager for verification rewards
-            if (rewardsHandler != null) {
-                purgatoryManager.setRewardsHandler(rewardsHandler);
-            }
-            
-            logger.info("Purgatory Manager initialized successfully");
-            
-        } catch (Exception e) {
-            exceptionHandler.handleIntegrationException("Core Components", "initialization", e);
-        }
-    }
-    
-    /**
-     * Initializes Discord integration if enabled
-     */
-    private void initializeDiscordIntegration() {
-        try {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> discordConfig = (Map<String, Object>) config.get("discord");
-            
-            if (discordConfig == null) {
-                logger.info("Discord configuration not found, Discord features will be disabled");
-                return;
-            }
-            
-            boolean discordEnabled = Boolean.parseBoolean(discordConfig.getOrDefault("enabled", "false").toString());
-            
-            if (!discordEnabled) {
-                logger.info("Discord integration is disabled in configuration");
-                return;
-            }
-            
-            // Initialize Discord bot handler
+    private CompletableFuture<Void> initializeComponentsInParallel() {
+        // Initialize database monitor first (depends on sqlHandler which is already initialized)
+        CompletableFuture<Void> databaseMonitorFuture = CompletableFuture.runAsync(() -> {
             try {
-                discordBotHandler = new DiscordBotHandler(logger, sqlHandler);
-                
-                // Set the purgatory manager in the Discord bot handler
-                if (purgatoryManager != null) {
-                    discordBotHandler.setPurgatoryManager(purgatoryManager);
-                }
-                
-                // Initialize the Discord bot with the configuration
-                Properties discordProperties = new Properties();
-                for (Map.Entry<String, Object> entry : discordConfig.entrySet()) {
-                    if (entry.getValue() != null) {
-                        discordProperties.setProperty("discord." + entry.getKey(), entry.getValue().toString());
-                    }
-                }
-                  // Initialize the Discord bot asynchronously
-                discordBotHandler.initialize(discordProperties)
-                    .thenAccept(success -> {                        if (success) {
-                            logger.info("Discord bot successfully connected and initialized");
-                        } else {
-                            logger.warn("Discord bot initialization failed or was disabled");
-                            discordBotHandler = null; // Clear failed handler
-                        }
-                    })
-                    .exceptionally(ex -> {
-                        exceptionHandler.handleIntegrationException("Discord Bot", "initialization", ex);
-                        discordBotHandler = null; // Clear failed handler
-                        return null;
-                    });
-                
-                logger.info("Discord bot handler initialized");
+                initializeDatabaseMonitor();
             } catch (Exception e) {
-                exceptionHandler.handleIntegrationException("Discord Bot Handler", "initialization", e);
-                discordBotHandler = null;
+                throw new RuntimeException("Database monitor initialization failed", e);
             }
-        } catch (Exception e) {
-            exceptionHandler.handleIntegrationException("Discord Integration", "initialization", e);
-        }
+        }, initializationExecutor);
+        
+        // Initialize integrations in parallel (independent of each other)
+        CompletableFuture<Void> vaultIntegrationFuture = CompletableFuture.runAsync(() -> {
+            try {
+                initializeVaultIntegration();
+            } catch (Exception e) {
+                throw new RuntimeException("Vault integration initialization failed", e);
+            }
+        }, initializationExecutor);
+        
+        CompletableFuture<Void> luckPermsIntegrationFuture = CompletableFuture.runAsync(() -> {
+            try {
+                initializeLuckPermsIntegration();
+            } catch (Exception e) {
+                throw new RuntimeException("LuckPerms integration initialization failed", e);
+            }
+        }, initializationExecutor);
+        
+        // Wait for integrations to complete before initializing components that might depend on them
+        CompletableFuture<Void> integrationsFuture = CompletableFuture.allOf(
+            vaultIntegrationFuture, 
+            luckPermsIntegrationFuture
+        );
+        
+        // Initialize core components after integrations complete
+        CompletableFuture<Void> coreComponentsFuture = integrationsFuture.thenCompose(v -> {
+            // XP Manager (only depends on sqlHandler and config)
+            CompletableFuture<Void> xpManagerFuture = CompletableFuture.runAsync(() -> {
+                try {
+                    initializeXPManager();
+                } catch (Exception e) {
+                    throw new RuntimeException("XP Manager initialization failed", e);
+                }
+            }, initializationExecutor);
+            
+            // Initialize Purgatory Manager (depends on sqlHandler)
+            CompletableFuture<Void> purgatoryManagerFuture = CompletableFuture.runAsync(() -> {
+                try {
+                    initializePurgatoryManager();
+                } catch (Exception e) {
+                    throw new RuntimeException("Purgatory Manager initialization failed", e);
+                }
+            }, initializationExecutor);
+            
+            return CompletableFuture.allOf(xpManagerFuture, purgatoryManagerFuture);
+        });
+        
+        // Initialize Discord and Rewards Handler after core components
+        CompletableFuture<Void> finalComponentsFuture = coreComponentsFuture.thenCompose(v -> {
+            // Discord integration (can run in parallel with rewards handler)
+            CompletableFuture<Void> discordFuture = CompletableFuture.runAsync(() -> {
+                try {
+                    initializeDiscordIntegration();
+                } catch (Exception e) {
+                    throw new RuntimeException("Discord integration initialization failed", e);
+                }
+            }, initializationExecutor);
+            
+            // Rewards Handler (may depend on Discord, but can handle null Discord)
+            CompletableFuture<Void> rewardsFuture = CompletableFuture.runAsync(() -> {
+                try {
+                    initializeRewardsHandler();
+                } catch (Exception e) {
+                    throw new RuntimeException("Rewards Handler initialization failed", e);
+                }
+            }, initializationExecutor);
+            
+            return CompletableFuture.allOf(discordFuture, rewardsFuture);
+        });
+        
+        // Combine all futures
+        return CompletableFuture.allOf(
+            databaseMonitorFuture,
+            finalComponentsFuture
+        );
     }
     
     /**
@@ -785,14 +816,21 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
             statusReport.append("✗ NOT INITIALIZED\n");
             allCriticalComponentsReady = false;
         }
-        
-        // Validate Database
+          // Validate Database
         statusReport.append("Database Connection: ");
         if (sqlHandler != null) {
             try {
-                // Test database connection
+                // Test database connection with detailed reporting
                 if (sqlHandler.testConnection()) {
-                    statusReport.append("✓ CONNECTED\n");
+                    statusReport.append("✓ CONNECTED");
+                    
+                    // Test basic functionality
+                    try {
+                        sqlHandler.getPlayerDiscordId("startup-validation-test");
+                        statusReport.append(" (Full functionality verified)\n");
+                    } catch (Exception tableEx) {
+                        statusReport.append(" (Connection OK, tables pending initialization)\n");
+                    }
                 } else {
                     statusReport.append("✗ CONNECTION FAILED\n");
                     allCriticalComponentsReady = false;
@@ -816,16 +854,16 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
         }
         
         // Validate Optional Components
-        statusReport.append("\n=== Optional Components ===\n");
-        
-        // Discord Bot Handler
+        statusReport.append("\n=== Optional Components ===\n");        // Discord Bot Handler
         statusReport.append("Discord Bot: ");
         if (discordBotHandler != null) {
-            statusReport.append("✓ INITIALIZED");
-            if (discordBotHandler.isConnected()) {
-                statusReport.append(" & CONNECTED\n");
+            if (discordBotHandler.isConnectionFailed()) {
+                statusReport.append("✗ FAILED TO CONNECT\n");
+                allCriticalComponentsReady = false;
+            } else if (discordBotHandler.getConnectionStatus()) {
+                statusReport.append("✓ INITIALIZED & CONNECTED\n");
             } else {
-                statusReport.append(" (connecting...)\n");
+                statusReport.append("(connecting...)\n");
             }
         } else {
             statusReport.append("- DISABLED\n");
@@ -846,11 +884,24 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
         } else {
             statusReport.append("- DISABLED\n");
         }
-        
-        // Vault Integration
+          // Vault Integration
         statusReport.append("Vault Integration: ");
         if (vaultIntegration != null) {
-            statusReport.append("✓ AVAILABLE\n");
+            try {
+                boolean economyAvailable = vaultIntegration.isEconomyAvailable();
+                boolean permissionsAvailable = vaultIntegration.isPermissionsAvailable();
+                
+                if (economyAvailable || permissionsAvailable) {
+                    statusReport.append("✓ AVAILABLE");
+                    if (economyAvailable) statusReport.append(" (Economy)");
+                    if (permissionsAvailable) statusReport.append(" (Permissions)");
+                    statusReport.append("\n");
+                } else {
+                    statusReport.append("✓ INITIALIZED (No features available)\n");
+                }
+            } catch (Exception e) {
+                statusReport.append("✓ INITIALIZED (Status check failed: ").append(e.getMessage()).append(")\n");
+            }
         } else {
             statusReport.append("- NOT AVAILABLE\n");
         }
@@ -858,7 +909,15 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
         // LuckPerms Integration
         statusReport.append("LuckPerms Integration: ");
         if (luckPermsIntegration != null) {
-            statusReport.append("✓ AVAILABLE\n");
+            try {
+                if (luckPermsIntegration.isAvailable()) {
+                    statusReport.append("✓ AVAILABLE & READY\n");
+                } else {
+                    statusReport.append("✓ INITIALIZED (Not ready)\n");
+                }
+            } catch (Exception e) {
+                statusReport.append("✓ INITIALIZED (Status check failed: ").append(e.getMessage()).append(")\n");
+            }
         } else {
             statusReport.append("- NOT AVAILABLE\n");
         }
@@ -957,6 +1016,190 @@ public class VelocityDiscordWhitelist {    private final ProxyServer server;
             logger.error("Error during configuration validation", e);
             return false;
         }
+    }
+    
+    /**
+     * Performs a comprehensive health check of all plugin components
+     * 
+     * @return A map containing the health status of each component
+     */
+    public Map<String, String> performHealthCheck() {
+        Map<String, String> healthStatus = new HashMap<>();
+        
+        // Check configuration
+        if (config != null && !config.isEmpty()) {
+            healthStatus.put("configuration", "HEALTHY");
+        } else {
+            healthStatus.put("configuration", "FAILED - Configuration not loaded");
+        }
+          // Check database
+        if (sqlHandler != null && validateDatabaseConnection()) {
+            healthStatus.put("database", "HEALTHY");
+        } else {
+            healthStatus.put("database", "FAILED - Connection unavailable");
+        }
+        
+        // Check database monitor
+        if (databaseMonitor != null) {
+            if (databaseMonitor.isMonitoring()) {
+                int retryCount = databaseMonitor.getCurrentRetryCount();
+                if (retryCount > 0) {
+                    healthStatus.put("databaseMonitor", "MONITORING - Retry attempts: " + retryCount);
+                } else {
+                    healthStatus.put("databaseMonitor", "HEALTHY - Monitoring active");
+                }
+            } else {
+                healthStatus.put("databaseMonitor", "INACTIVE - Not monitoring");
+            }
+        } else {
+            healthStatus.put("databaseMonitor", "NOT_CONFIGURED");
+        }
+        
+        // Check purgatory manager
+        if (purgatoryManager != null) {
+            healthStatus.put("purgatory", "HEALTHY");
+        } else {
+            healthStatus.put("purgatory", "FAILED - Not initialized");
+        }
+        
+        // Check Discord bot
+        if (discordBotHandler != null) {
+            if (discordBotHandler.getConnectionStatus()) {
+                healthStatus.put("discord", "HEALTHY - Connected");
+            } else {
+                healthStatus.put("discord", "DEGRADED - Connecting...");
+            }
+        } else {
+            healthStatus.put("discord", "DISABLED");
+        }
+        
+        // Check integrations
+        if (vaultIntegration != null) {
+            try {
+                boolean hasFeatures = vaultIntegration.isEconomyAvailable() || vaultIntegration.isPermissionsAvailable();
+                healthStatus.put("vault", hasFeatures ? "HEALTHY" : "DEGRADED - No features available");
+            } catch (Exception e) {
+                healthStatus.put("vault", "DEGRADED - " + e.getMessage());
+            }
+        } else {
+            healthStatus.put("vault", "DISABLED");
+        }
+        
+        if (luckPermsIntegration != null) {
+            try {
+                boolean available = luckPermsIntegration.isAvailable();
+                healthStatus.put("luckperms", available ? "HEALTHY" : "DEGRADED - Not ready");
+            } catch (Exception e) {
+                healthStatus.put("luckperms", "DEGRADED - " + e.getMessage());
+            }
+        } else {
+            healthStatus.put("luckperms", "DISABLED");
+        }
+          return healthStatus;
+    }
+
+    /**
+     * Initializes the Vault integration
+     * This method can run in parallel with other integration initializations
+     */
+    private void initializeVaultIntegration() {
+        try {
+            vaultIntegration = new VaultIntegration(server, logger, debugEnabled, config);
+            logger.info("Vault integration initialized successfully");
+        } catch (NoClassDefFoundError e) {
+            logger.info("Vault not found, economy features will be disabled");
+            vaultIntegration = null;
+        } catch (Exception e) {
+            exceptionHandler.handleIntegrationException("Vault", "initialization", e);
+            vaultIntegration = null;
+        }
+    }
+    
+    /**
+     * Initializes the LuckPerms integration
+     * This method can run in parallel with other integration initializations
+     */
+    private void initializeLuckPermsIntegration() {
+        try {
+            if (!LuckPermsIntegration.isLuckPermsAvailable()) {
+                logger.info("LuckPerms not found, permission features will be disabled");
+                luckPermsIntegration = null;
+                return;
+            }
+            
+            luckPermsIntegration = new LuckPermsIntegration(logger, debugEnabled, config);
+            logger.info("LuckPerms integration initialized successfully");
+        } catch (Exception e) {
+            exceptionHandler.handleIntegrationException("LuckPerms", "initialization", e);
+            luckPermsIntegration = null;
+        }
+    }
+    
+    /**
+     * Initializes the XP Manager
+     * Depends on: sqlHandler, config, exceptionHandler
+     */
+    private void initializeXPManager() {
+        if (sqlHandler != null) {
+            xpManager = new XPManager(sqlHandler, logger, debugEnabled, config, exceptionHandler);
+            logger.info("XP Manager initialized successfully");
+        } else {
+            throw new IllegalStateException("SQLHandler is required for XPManager");
+        }
+    }
+    
+    /**
+     * Initializes the Purgatory Manager
+     * Depends on: sqlHandler, config
+     */
+    private void initializePurgatoryManager() {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> purgatoryConfigMap = (Map<String, Object>) config.getOrDefault("purgatory", new HashMap<>());
+        int purgatorySessionTimeout = Integer.parseInt(purgatoryConfigMap.getOrDefault("session_timeout_minutes", "30").toString());
+        
+        purgatoryManager = new EnhancedPurgatoryManager(logger, debugEnabled, sqlHandler, purgatorySessionTimeout);
+        logger.info("Purgatory Manager initialized successfully");
+    }
+    
+    /**
+     * Initializes the Discord Bot Handler
+     * Depends on: config, exceptionHandler, sqlHandler, purgatoryManager
+     */
+    private void initializeDiscordIntegration() {
+        if (config == null || exceptionHandler == null || sqlHandler == null) {
+            throw new IllegalStateException("Config, ExceptionHandler, and SQLHandler are required for Discord integration");
+        }
+        try {
+            // Get the Discord config section from YAML
+            @SuppressWarnings("unchecked")
+            Map<String, Object> discordConfig = (Map<String, Object>) config.getOrDefault("discord", new HashMap<>());
+            if (purgatoryManager != null) {
+                discordBotHandler = new DiscordBotHandler(purgatoryManager, sqlHandler, logger, discordConfig);
+            } else {
+                logger.error("PurgatoryManager is required for DiscordBotHandler initialization. Discord bot will not start.");
+                discordBotHandler = null;
+            }
+            logger.info("Discord Bot Handler initialized successfully");
+        } catch (Exception e) {
+            logger.warn("Discord integration failed to initialize: " + e.getMessage());
+            discordBotHandler = null;
+        }
+    }
+
+    /**
+     * Initializes the Rewards Handler
+     * Depends on: sqlHandler, server, config, and optionally vaultIntegration, luckPermsIntegration, discordBotHandler
+     */
+    private void initializeRewardsHandler() {
+        // Use existing discordBotHandler if available, null otherwise
+        rewardsHandler = new RewardsHandler(sqlHandler, discordBotHandler, server, logger, debugEnabled, config, vaultIntegration, luckPermsIntegration);
+        
+        // Set the rewards handler in purgatory manager for verification rewards if both are available
+        if (rewardsHandler != null && purgatoryManager != null) {
+            purgatoryManager.setRewardsHandler(rewardsHandler);
+        }
+        
+        logger.info("Rewards Handler initialized successfully");
     }
 
 }

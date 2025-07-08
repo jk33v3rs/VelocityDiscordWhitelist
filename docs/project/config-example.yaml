@@ -1,5 +1,5 @@
-# VelocityDiscordWhitelist Configuration v1.0.11
-# Full configuration file based on actual plugin implementation
+# VelocityDiscordWhitelist Configuration Example
+# Copy this file to src/main/resources/config.yaml and customize for your setup
 
 # Database Configuration
 database:
@@ -7,22 +7,19 @@ database:
   port: 3306
   database: "discord_whitelist"
   table: "whitelist"
-  username: "root"
-  password: "password"
+  username: "your_username"
+  password: "your_password"
 
 # Discord Bot Configuration
 discord:
   enabled: true  # Set to false to disable Discord integration entirely
   token: "YOUR_BOT_TOKEN_HERE"
-  guild_id: "123456789012345678"
-  verification_channel: "123456789012345678"
+  guild_id: "YOUR_GUILD_ID_HERE"
+  verification_channel: "YOUR_VERIFICATION_CHANNEL_ID_HERE"
   init_timeout: 30
   roles:
-    # Admin role - users with this role have admin privileges
-    admin: "987654321098765432"
-    # Verified role - users with this role are considered verified members and can join the server
-    # Users WITHOUT this role are denied access unless they have an active purgatory session
-    verified: "765432109876543210"    # Discord role mappings are handled via LuckPerms integration only
+    admin: "YOUR_ADMIN_ROLE_ID_HERE"
+    verified: "YOUR_VERIFIED_ROLE_ID_HERE"
 
 # Plugin Settings
 settings:
@@ -53,17 +50,9 @@ vault:
     enabled: false
     whitelist_reward: 100.0
     rank_progression_reward: 50.0
-    # Rank-based rewards (base amounts)
     rank_base_reward: 500
-    subrank_multiplier: 0.5    # Each sub-rank adds 50% more
-    mainrank_multiplier: 2.0   # Each main rank doubles the base
-    # Special rank milestones with bonus rewards
-    milestone_bonuses:
-      explorer: 1000      # 5th main rank milestone
-      journeyman: 2500    # 9th main rank milestone
-      veteran: 5000       # 16th main rank milestone
-      titan: 10000        # 19th main rank milestone
-      deity: 25000        # Final rank achievement
+    subrank_multiplier: 0.5
+    mainrank_multiplier: 2.0
   permissions:
     enabled: false
   reward_server: "survival"
@@ -73,75 +62,24 @@ luckperms:
   enabled: false
   default_group: "verified"
   managed_groups:
-    # Core verification groups
-    - "verified"
-    - "unverified"
-    # All 25 main ranks from correct_rank_system.md - USE CANONICAL NAMES ONLY
     - "bystander"
     - "onlooker"
     - "wanderer"
     - "traveller"
     - "explorer"
-    - "adventurer"
-    - "surveyor"
-    - "navigator"
-    - "journeyman"
-    - "pathfinder"
-    - "trailblazer"
-    - "pioneer"
-    - "craftsman"
-    - "specialist"
-    - "artisan"
-    - "veteran"
-    - "sage"
-    - "luminary"
-    - "titan"
-    - "legend"
-    - "eternal"
-    - "ascendant"
-    - "celestial"
-    - "divine"
-    - "deity"
-    # Special administrative groups
-    - "admin"
-    - "mod"
-    - "booster"
+    - "verified"
   discord_role_mappings:
-    # Map Discord roles DIRECTLY to canonical rank names - NO custom group names!
-    # Special roles (non-progression)
-    "discord-admin-role-id": "admin"
-    "discord-verified-role-id": "verified"
-    "discord-mod-role-id": "mod"
-    "discord-booster-role-id": "booster"
-    # Main rank role mappings - use CANONICAL rank names only
-    "discord-bystander-role-id": "bystander"
-    "discord-onlooker-role-id": "onlooker"
-    "discord-wanderer-role-id": "wanderer"
-    "discord-traveller-role-id": "traveller"
-    "discord-explorer-role-id": "explorer"
-    "discord-adventurer-role-id": "adventurer"
-    "discord-surveyor-role-id": "surveyor"
-    "discord-navigator-role-id": "navigator"
-    "discord-journeyman-role-id": "journeyman"
-    "discord-pathfinder-role-id": "pathfinder"
-    "discord-trailblazer-role-id": "trailblazer"
-    "discord-pioneer-role-id": "pioneer"
-    "discord-craftsman-role-id": "craftsman"
-    "discord-specialist-role-id": "specialist"
-    "discord-artisan-role-id": "artisan"
-    "discord-veteran-role-id": "veteran"
-    "discord-sage-role-id": "sage"
-    "discord-luminary-role-id": "luminary"
-    "discord-titan-role-id": "titan"
-    "discord-legend-role-id": "legend"
-    "discord-eternal-role-id": "eternal"
-    "discord-ascendant-role-id": "ascendant"
-    "discord-celestial-role-id": "celestial"
-    "discord-divine-role-id": "divine"
-    "discord-deity-role-id": "deity"
+    "YOUR_DISCORD_ROLE_ID_1": "luckperms-group-1"
+    "YOUR_DISCORD_ROLE_ID_2": "luckperms-group-2"
+  rank_mappings:
+    "rank_1_0": "bystander"
+    "rank_1_1": "onlooker"
+    "rank_2_0": "wanderer"
+    "rank_2_1": "traveller"
+    "rank_3_0": "explorer"
+    "rank_3_1": "verified"
   discord_mappings:
-    # Special Discord user mappings for individual users
-    "123456789012345678": "admin"
+    "YOUR_SPECIAL_DISCORD_ID": "special_group"
 
 # Rewards Configuration
 rewards:
@@ -152,7 +90,7 @@ ranks:
   enabled: true
   main_ranks:
     - "bystander"
-    - "onlooker"
+    - "onlooker" 
     - "wanderer"
     - "traveller"
     - "explorer"
@@ -211,17 +149,28 @@ xp:
     trade: 0.6
     fishing: 0.4
     mining: 0.3
-  blaze_and_caves:
+
+# Integrations Configuration
+integrations:
+  # BlazeAndCaves Advancement Pack Integration
+  blazeandcaves:
     enabled: false  # Set to true to enable BlazeAndCaves integration
     achievements_file: "blazeandcaves-achievements.json"
     auto_detect: true  # Automatically detect when BlazeAndCaves pack is loaded
-    easy_multiplier: 1.0
-    medium_multiplier: 1.25
-    hard_multiplier: 1.5
-    insane_multiplier: 2.0
-    extreme_multiplier: 3.0
-    terralith_bonus: 0.1  # +10% bonus for Terralith achievements
-    hardcore_bonus: 0.5   # +50% bonus for hardcore achievements
+    xp_multipliers:
+      easy: 1.0
+      medium: 1.25
+      hard: 1.5
+      insane: 2.0
+      extreme: 3.0
+    variant_bonuses:
+      terralith: 0.1  # +10% bonus for Terralith achievements
+      hardcore: 0.5   # +50% bonus for hardcore achievements
+    rewards:
+      enabled: true
+      give_items: true      # Whether to give item rewards from achievements
+      give_trophies: true   # Whether to give trophy rewards
+      announce: true        # Whether to announce achievements in chat
 
 # Messages Configuration
 messages:

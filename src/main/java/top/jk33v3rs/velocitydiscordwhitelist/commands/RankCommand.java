@@ -11,6 +11,7 @@ import com.velocitypowered.api.proxy.Player;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import top.jk33v3rs.velocitydiscordwhitelist.models.RankDefinition;
 import top.jk33v3rs.velocitydiscordwhitelist.models.XPEvent;
 import top.jk33v3rs.velocitydiscordwhitelist.modules.RewardsHandler;
 import top.jk33v3rs.velocitydiscordwhitelist.modules.XPManager;
@@ -88,10 +89,8 @@ public class RankCommand {
             if (playerRank != null) {
                 Component header = Component.text("═══ Your Rank Information ═══", NamedTextColor.GOLD, TextDecoration.BOLD);
                 player.sendMessage(header);
-                
-                Component rankInfo = Component.text("Current Rank: ", NamedTextColor.YELLOW)
-                    .append(Component.text("Main Rank " + playerRank.getMainRank() + 
-                                         ", Sub Rank " + playerRank.getSubRank(), NamedTextColor.GREEN));
+                  Component rankInfo = Component.text("Current Rank: ", NamedTextColor.YELLOW)
+                    .append(Component.text(playerRank.getFormattedRank(), NamedTextColor.GREEN));
                 player.sendMessage(rankInfo);
                 
                 Component playTime = Component.text("Play Time: ", NamedTextColor.YELLOW)
@@ -139,11 +138,9 @@ public class RankCommand {
             if (playerRank != null) {
                 Component header = Component.text("═══ Detailed Progress ═══", NamedTextColor.GOLD, TextDecoration.BOLD);
                 player.sendMessage(header);
-                
-                // Current rank progress
+                  // Current rank progress
                 Component currentRank = Component.text("Current Position: ", NamedTextColor.YELLOW)
-                    .append(Component.text("Rank " + playerRank.getMainRank() + 
-                                         "." + playerRank.getSubRank(), NamedTextColor.GREEN));
+                    .append(Component.text(playerRank.getFormattedRank(), NamedTextColor.GREEN));
                 player.sendMessage(currentRank);
                 
                 // Progress metrics with calculated requirements
@@ -160,18 +157,21 @@ public class RankCommand {
                     .append(Component.text(" / ", NamedTextColor.GRAY))
                     .append(Component.text(String.valueOf(requiredAchievements), NamedTextColor.GREEN));
                 player.sendMessage(achievementProgress);
-                
-                // Next rank preview with requirements
-                int nextMainRank = playerRank.getMainRank();
-                int nextSubRank = playerRank.getSubRank() + 1;
-                if (nextSubRank > 3) { // Assuming max 3 sub-ranks per main rank
-                    nextMainRank++;
-                    nextSubRank = 1;
+                  // Next rank preview with requirements
+                int[] nextRankArray = RankDefinition.getNextRank(playerRank.getMainRank(), playerRank.getSubRank());
+                if (nextRankArray != null) {
+                    int nextMainRank = nextRankArray[0];
+                    int nextSubRank = nextRankArray[1];
+                    String nextRankFormatted = RankDefinition.formatRankDisplay(nextSubRank, nextMainRank);
+                    
+                    player.sendMessage(Component.text("Next Rank: ", NamedTextColor.YELLOW)
+                        .append(Component.text(nextRankFormatted, NamedTextColor.AQUA))
+                        .append(Component.text(" (Need: " + formatPlayTime(rewardsHandler.calculateRequiredPlayTime(nextMainRank, nextSubRank)) + 
+                                             ", " + rewardsHandler.calculateRequiredAchievements(nextMainRank, nextSubRank) + " achievements)", NamedTextColor.GRAY)));
+                } else {
+                    player.sendMessage(Component.text("Next Rank: ", NamedTextColor.YELLOW)
+                        .append(Component.text("Maximum rank achieved!", NamedTextColor.GOLD)));
                 }
-                player.sendMessage(Component.text("Next Rank: ", NamedTextColor.YELLOW)
-                    .append(Component.text("Rank " + nextMainRank + "." + nextSubRank, NamedTextColor.AQUA))
-                    .append(Component.text(" (Need: " + formatPlayTime(rewardsHandler.calculateRequiredPlayTime(nextMainRank, nextSubRank)) + 
-                                         ", " + rewardsHandler.calculateRequiredAchievements(nextMainRank, nextSubRank) + " achievements)", NamedTextColor.GRAY)));
                 
                 Component tips = Component.text("💡 Tip: Complete advancements and play actively to gain XP!", 
                                               NamedTextColor.LIGHT_PURPLE, TextDecoration.ITALIC);

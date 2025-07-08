@@ -721,14 +721,34 @@ public class SQLHandler implements AutoCloseable {
      * @param sql    The SQL statement with parameter placeholders
      * @param params The parameters to set in the statement
      * @return The number of affected rows
-     */
-    private int executeUpdate(String sql, Object[] params) {
+     */    private int executeUpdate(String sql, Object[] params) {
         return exceptionHandler.executeWithHandling("executing SQL update: " + sql, () -> {
             try (Connection conn = getConnection();
                     PreparedStatement stmt = conn.prepareStatement(sql)) {
                 if (params != null) {
                     for (int i = 0; i < params.length; i++) {
-                        stmt.setObject(i + 1, params[i]);
+                        Object param = params[i];
+                        if (param == null) {
+                            stmt.setNull(i + 1, java.sql.Types.VARCHAR);
+                        } else if (param instanceof String) {
+                            stmt.setString(i + 1, (String) param);
+                        } else if (param instanceof Integer) {
+                            stmt.setInt(i + 1, (Integer) param);
+                        } else if (param instanceof Long) {
+                            stmt.setLong(i + 1, (Long) param);                        } else if (param instanceof java.sql.Timestamp) {
+                            stmt.setTimestamp(i + 1, (java.sql.Timestamp) param);
+                        } else if (param instanceof Boolean) {
+                            stmt.setBoolean(i + 1, (Boolean) param);
+                        } else if (param instanceof Double) {
+                            stmt.setDouble(i + 1, (Double) param);
+                        } else if (param instanceof Float) {
+                            stmt.setFloat(i + 1, (Float) param);
+                        } else if (param instanceof java.sql.Date) {
+                            stmt.setDate(i + 1, (java.sql.Date) param);
+                        } else {
+                            // Convert unknown types to string as a last resort
+                            stmt.setString(i + 1, param.toString());
+                        }
                     }
                 }
                 return stmt.executeUpdate();
@@ -749,14 +769,35 @@ public class SQLHandler implements AutoCloseable {
      * @param params The parameters for the query
      * @param mapper The function to map ResultSet to result type
      * @return Optional containing the result if found
-     */
-    private <T> Optional<T> executeQueryForSingleResult(String sql, Object[] params, ResultSetMapper<T> mapper) {
+     */    private <T> Optional<T> executeQueryForSingleResult(String sql, Object[] params, ResultSetMapper<T> mapper) {
         return exceptionHandler.executeWithHandling("executing SQL query: " + sql, () -> {
             try (Connection conn = getConnection();
                     PreparedStatement stmt = conn.prepareStatement(sql)) {
                 if (params != null) {
                     for (int i = 0; i < params.length; i++) {
-                        stmt.setObject(i + 1, params[i]);
+                        Object param = params[i];
+                        if (param == null) {
+                            stmt.setNull(i + 1, java.sql.Types.VARCHAR);
+                        } else if (param instanceof String) {
+                            stmt.setString(i + 1, (String) param);
+                        } else if (param instanceof Integer) {
+                            stmt.setInt(i + 1, (Integer) param);
+                        } else if (param instanceof Long) {
+                            stmt.setLong(i + 1, (Long) param);
+                        } else if (param instanceof java.sql.Timestamp) {
+                            stmt.setTimestamp(i + 1, (java.sql.Timestamp) param);
+                        } else if (param instanceof Boolean) {
+                            stmt.setBoolean(i + 1, (Boolean) param);
+                        } else if (param instanceof Double) {
+                            stmt.setDouble(i + 1, (Double) param);
+                        } else if (param instanceof Float) {
+                            stmt.setFloat(i + 1, (Float) param);
+                        } else if (param instanceof java.sql.Date) {
+                            stmt.setDate(i + 1, (java.sql.Date) param);
+                        } else {
+                            // Convert unknown types to string as a last resort
+                            stmt.setString(i + 1, param.toString());
+                        }
                     }
                 }
                 try (ResultSet rs = stmt.executeQuery()) {
@@ -782,15 +823,35 @@ public class SQLHandler implements AutoCloseable {
      * @param params The parameters for the query
      * @param mapper The function to map ResultSet to result type
      * @return List of results
-     */
-    private <T> List<T> executeQueryForMultipleResults(String sql, Object[] params, ResultSetMapper<T> mapper) {
+     */    private <T> List<T> executeQueryForMultipleResults(String sql, Object[] params, ResultSetMapper<T> mapper) {
         return exceptionHandler.executeWithHandling("executing SQL query for multiple results: " + sql, () -> {
             List<T> results = new ArrayList<>();
             try (Connection conn = getConnection();
                     PreparedStatement stmt = conn.prepareStatement(sql)) {
                 if (params != null) {
                     for (int i = 0; i < params.length; i++) {
-                        stmt.setObject(i + 1, params[i]);
+                        Object param = params[i];
+                        if (param == null) {
+                            stmt.setNull(i + 1, java.sql.Types.VARCHAR);
+                        } else if (param instanceof String) {
+                            stmt.setString(i + 1, (String) param);
+                        } else if (param instanceof Integer) {
+                            stmt.setInt(i + 1, (Integer) param);
+                        } else if (param instanceof Long) {
+                            stmt.setLong(i + 1, (Long) param);                        } else if (param instanceof java.sql.Timestamp) {
+                            stmt.setTimestamp(i + 1, (java.sql.Timestamp) param);
+                        } else if (param instanceof Boolean) {
+                            stmt.setBoolean(i + 1, (Boolean) param);
+                        } else if (param instanceof Double) {
+                            stmt.setDouble(i + 1, (Double) param);
+                        } else if (param instanceof Float) {
+                            stmt.setFloat(i + 1, (Float) param);
+                        } else if (param instanceof java.sql.Date) {
+                            stmt.setDate(i + 1, (java.sql.Date) param);
+                        } else {
+                            // Convert unknown types to string as a last resort
+                            stmt.setString(i + 1, param.toString());
+                        }
                     }
                 }
                 try (ResultSet rs = stmt.executeQuery()) {
@@ -1397,9 +1458,99 @@ public class SQLHandler implements AutoCloseable {
      */
     public boolean testConnection() {
         try (Connection conn = getConnection()) {
-            return conn != null && !conn.isClosed() && conn.isValid(5);
+            return conn != null && conn.isValid(5);
         } catch (SQLException e) {
-            exceptionHandler.handleDatabaseException("connection test", e, "Failed to test database connection");
+            if (debugEnabled) {
+                debugLog("Database connection test failed: " + e.getMessage());
+            }
+            return false;
+        }
+    }
+
+    /**
+     * isDatabaseAvailable
+     *
+     * Performs a lightweight health check to determine if the database is available.
+     * This method is used by DatabaseMonitor to check connectivity status.
+     * 
+     * @return boolean true if the database is available and responsive, false otherwise
+     */
+    public boolean isDatabaseAvailable() {
+        try (Connection conn = getConnection()) {
+            if (conn == null || !conn.isValid(5)) {
+                return false;
+            }
+            
+            // Perform a lightweight query to verify database responsiveness
+            try (PreparedStatement stmt = conn.prepareStatement("SELECT 1")) {
+                try (ResultSet rs = stmt.executeQuery()) {
+                    return rs.next() && rs.getInt(1) == 1;
+                }
+            }
+        } catch (SQLException e) {
+            if (debugEnabled) {
+                debugLog("Database availability check failed: " + e.getMessage());
+            }
+            return false;
+        }
+    }
+
+    /**
+     * retryConnection
+     *
+     * Attempts to restore the database connection by closing and reinitializing
+     * the HikariCP data source. This method is used by DatabaseMonitor for
+     * automatic connection recovery.
+     * 
+     * @return boolean true if the connection was successfully restored, false otherwise
+     */
+    public boolean retryConnection() {
+        try {
+            if (debugEnabled) {
+                debugLog("Attempting to restore database connection...");
+            }
+            
+            // Close existing connections in the pool
+            if (dataSource != null && !dataSource.isClosed()) {
+                dataSource.close();
+                if (debugEnabled) {
+                    debugLog("Closed existing connection pool");
+                }
+            }
+            
+            // Small delay to allow connection cleanup
+            Thread.sleep(1000);
+            
+            // The dataSource is final, so we cannot reinitialize it here
+            // Instead, we'll test if the existing pool can recover
+            try (Connection conn = dataSource.getConnection()) {
+                if (conn != null && conn.isValid(5)) {
+                    // Test with a simple query
+                    try (PreparedStatement stmt = conn.prepareStatement("SELECT 1")) {
+                        try (ResultSet rs = stmt.executeQuery()) {
+                            boolean success = rs.next() && rs.getInt(1) == 1;
+                            if (success && debugEnabled) {
+                                debugLog("Database connection successfully restored");
+                            }
+                            return success;
+                        }
+                    }
+                }
+            }
+            
+            return false;
+            
+        } catch (SQLException e) {
+            if (debugEnabled) {
+                debugLog("Failed to restore database connection: " + e.getMessage());
+            }
+            exceptionHandler.handleDatabaseException("Database connection retry", e, "retryConnection method");
+            return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            if (debugEnabled) {
+                debugLog("Database connection retry interrupted");
+            }
             return false;
         }
     }

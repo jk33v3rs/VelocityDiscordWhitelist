@@ -255,7 +255,6 @@ public class BrigadierCommandHandler {
                         rewardsHandler.getPlayerRank(username).thenAccept(playerRank -> {
                             if (playerRank != null) {
                                 source.sendMessage(Component.text("Your current rank: " + playerRank.getFormattedRank(), NamedTextColor.AQUA));
-                                source.sendMessage(Component.text("Main Rank: " + playerRank.getMainRank() + ", Sub Rank: " + playerRank.getSubRank(), NamedTextColor.GREEN));
                                 source.sendMessage(Component.text("Play Time: " + playerRank.getPlayTimeMinutes() + " minutes", NamedTextColor.YELLOW));
                                 source.sendMessage(Component.text("Achievements: " + playerRank.getAchievementsCompleted(), NamedTextColor.YELLOW));
                             } else {

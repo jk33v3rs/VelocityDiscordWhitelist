@@ -1,7 +1,7 @@
 
 # Correct Rank System for VelocityDiscordWhitelist
 
-## Main Ranks (25 total):
+## Main Ranks (25 total)
 1. bystander
 2. onlooker
 3. wanderer
@@ -28,7 +28,7 @@
 24. divine
 25. deity
 
-## Sub-Ranks (7 total):
+## Sub-Ranks (7 total)
 1. Novice
 2. Apprentice
 3. Adept
@@ -37,7 +37,7 @@
 6. Mythic
 7. Immortal
 
-## Rank Progression System:
+## Rank Progression System
 - Players progress through sub-ranks 1-7 within each main rank
 - After completing sub-rank 7 (Immortal) of a main rank, they advance to sub-rank 1 (Novice) of the next main rank
 - Total possible combinations: 25 main ranks × 7 sub-ranks = 175 total rank positions

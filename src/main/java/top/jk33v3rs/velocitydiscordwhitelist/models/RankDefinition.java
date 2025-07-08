@@ -78,11 +78,10 @@ public class RankDefinition {
     
     public RankRewards getRewards() { return rewards; }
     public void setRewards(RankRewards rewards) { this.rewards = rewards != null ? rewards : RankRewards.createEmpty(); }
-    
-    /**
+      /**
      * getFormattedRankName
-     * Gets the formatted full rank name (sub-rank + main rank)
-     * @return The formatted rank name
+     * Gets the formatted full rank name in "subrank mainrank" format
+     * @return The formatted rank name (e.g., "immortal deity")
      */
     public String getFormattedRankName() {
         String[] parts = rankName.split(" ", 2);
@@ -148,15 +147,13 @@ public class RankDefinition {
             default -> 0;
         };
     }
-    
-    /**
+      /**
      * formatRankDisplay
      * Creates a formatted rank display using subrank and main rank
      * @param subRankId The subrank ID (1-7)
      * @param mainRankName The main rank name
-     * @return The formatted rank string
-     */
-    public static String formatRankDisplay(int subRankId, String mainRankName) {
+     * @return The formatted rank string in "subrank mainrank" format
+     */    public static String formatRankDisplay(int subRankId, String mainRankName) {
         String subRankName = getSubRankNameById(subRankId);
         if ("unknown".equals(subRankName) || mainRankName == null || mainRankName.isEmpty()) {
             return mainRankName != null ? mainRankName : "unknown";
@@ -241,15 +238,13 @@ public class RankDefinition {
             default -> 0;
         };
     }
-    
-    /**
+      /**
      * formatRankDisplay
      * Creates a formatted rank display using main and subrank IDs
      * @param subRankId The subrank ID (1-7)
      * @param mainRankId The main rank ID (1-25)
-     * @return The formatted rank string
-     */
-    public static String formatRankDisplay(int subRankId, int mainRankId) {
+     * @return The formatted rank string in "subrank mainrank" format
+     */    public static String formatRankDisplay(int subRankId, int mainRankId) {
         String subRankName = getSubRankNameById(subRankId);
         String mainRankName = getMainRankNameById(mainRankId);
         
@@ -293,13 +288,12 @@ public class RankDefinition {
         
         return null;
     }
-    
-    /**
+      /**
      * formatOfficialRankDisplay
      * Creates a formatted rank display using both main and subrank names
      * @param mainRankId The main rank ID (1-25)
      * @param subRankId The subrank ID (1-7)
-     * @return The formatted rank string
+     * @return The formatted rank string in "subrank mainrank" format
      */
     public static String formatOfficialRankDisplay(int mainRankId, int subRankId) {
         String mainRankName = getMainRankNameById(mainRankId);

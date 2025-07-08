@@ -1,0 +1,24 @@
+# VelocityDiscordWhitelist Messages
+# This file is automatically created if it doesn't exist
+
+# Basic Messages
+not_whitelisted: "You are not whitelisted on this server. Please check Discord for whitelist instructions."
+verification_code: "Your verification code is: %code%"
+verification_success: "Verification successful! Welcome to the server!"
+verification_failed: "Verification failed. Please try again."
+session_expired: "Your verification session has expired. Please request a new code."
+invalid_code: "Invalid verification code. Please check and try again."
+max_attempts_exceeded: "Maximum verification attempts exceeded. Please request a new code."
+already_verified: "You are already verified on this server."
+discord_link_success: "Your Discord account has been successfully linked!"
+
+# Command Messages
+no_permission: "You don't have permission to use this command!"
+player_not_found: "Player not found!"
+command_usage: "Usage: %usage%"
+reload_success: "Configuration reloaded successfully!"
+reload_failed: "Failed to reload configuration. Check console for errors."
+
+# Error Messages
+database_error: "A database error occurred. Please try again later."
+discord_error: "Discord integration error. Please try again later."

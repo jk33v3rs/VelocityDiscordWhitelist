@@ -354,7 +354,7 @@ public class DataBackupHandler {    private final Logger logger;
         BackupMetadata metadata = new BackupMetadata();
         metadata.version = "1.0";
         metadata.createdAt = LocalDateTime.now();
-        metadata.pluginVersion = "1.0.3";
+        metadata.pluginVersion = "1.0.10";
         metadata.compressionEnabled = compressionEnabled;
         return metadata;
     }
@@ -470,7 +470,6 @@ public class DataBackupHandler {    private final Logger logger;
      * @param includeTimestamps Whether to include timestamp data
      * @return The export file path on success, null on failure
      */
-    @SuppressWarnings("unused") // includeTimestamps reserved for future implementation
     private Path exportToJson(Path exportFile, boolean includeTimestamps) throws IOException {
         BackupData exportData = new BackupData();
         exportData.metadata = createBackupMetadata();

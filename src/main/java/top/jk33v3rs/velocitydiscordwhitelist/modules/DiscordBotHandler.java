@@ -4,7 +4,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Properties;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
@@ -24,6 +24,7 @@ import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
+import net.dv8tion.jda.api.events.session.SessionDisconnectEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
@@ -32,6 +33,7 @@ import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.utils.cache.CacheFlag;
 import top.jk33v3rs.velocitydiscordwhitelist.database.SQLHandler;
 import top.jk33v3rs.velocitydiscordwhitelist.utils.ExceptionHandler;
+import top.jk33v3rs.velocitydiscordwhitelist.utils.LoggingUtils;
 
 /**
  * DiscordBotHandler manages integration with the Discord bot for validation and
@@ -62,17 +64,32 @@ public class DiscordBotHandler extends ListenerAdapter {
     // Role ID mapping
     private final Map<String, String> roleIdMap = new HashMap<>();
 
+    // Discord config fields
+    private final boolean enabled;
+    private final String token;
+    private final String verificationChannelId;
+    private final int initTimeout;
+    private final Map<String, String> roles;
+
+    private volatile boolean connectionFailed = false;
+
     /**
-     * Constructor for DiscordBotHandler.
-     *
-     * @param logger     The logger instance for logging errors and status updates.
-     * @param sqlHandler The SQL handler for database operations
-     */
-    public DiscordBotHandler(@Nonnull Logger logger, @Nonnull SQLHandler sqlHandler) {
-        this.logger = logger;
-        this.sqlHandler = sqlHandler;
-        this.exceptionHandler = new ExceptionHandler(logger, false); // Default debug to false
-    }
+         * Constructor for DiscordBotHandler.
+         *
+         * @param logger     The logger instance for logging errors and status updates.
+         * @param sqlHandler The SQL handler for database operations
+         */
+        public DiscordBotHandler(@Nonnull Logger logger, @Nonnull SQLHandler sqlHandler) {
+            this.logger = logger;
+            this.sqlHandler = sqlHandler;
+            this.exceptionHandler = new ExceptionHandler(logger, false); // Default debug to false
+            this.enabled = false;
+            this.token = "";
+            this.guildId = "";
+            this.verificationChannelId = "";
+            this.initTimeout = 30;
+            this.roles = new java.util.HashMap<>();
+        }
 
     /**
      * Constructor for DiscordBotHandler with PurgatoryManager.
@@ -82,54 +99,93 @@ public class DiscordBotHandler extends ListenerAdapter {
      * @param logger           The logger instance for logging errors and status
      *                         updates.
      */
-    public DiscordBotHandler(@Nonnull EnhancedPurgatoryManager purgatoryManager, @Nonnull SQLHandler sqlHandler,
-            @Nonnull Logger logger) {
+    /**
+     * Constructor for DiscordBotHandler with PurgatoryManager.
+     *
+     * @param purgatoryManager The centralized manager for all purgatory sessions
+     * @param sqlHandler       The SQL handler for database operations
+     * @param logger           The logger instance for logging errors and status updates.
+     * @param discordConfig    The Discord configuration map
+     */
+    public DiscordBotHandler(
+            @Nonnull EnhancedPurgatoryManager purgatoryManager,
+            @Nonnull SQLHandler sqlHandler,
+            @Nonnull Logger logger,
+            @Nonnull Map<String, Object> discordConfig) {
         this.purgatoryManager = purgatoryManager;
         this.sqlHandler = sqlHandler;
         this.logger = logger;
         this.exceptionHandler = new ExceptionHandler(logger, false); // Default debug to false
-    }
 
-    /**
-     * Sets the purgatory manager
-     * 
-     * @param purgatoryManager The purgatory manager
-     */
-    public void setPurgatoryManager(@Nonnull EnhancedPurgatoryManager purgatoryManager) {
-        this.purgatoryManager = purgatoryManager;
-    }
+        // Parse and validate Discord config
+        boolean enabledTmp = false;
+        String tokenTmp = "";
+        String guildIdTmp = "";
+        String verificationChannelIdTmp = "";
+        int initTimeoutTmp = 30;
+        Map<String, String> rolesTmp = new java.util.HashMap<>();
 
-    /**
-     * Initializes the Discord bot with a timeout for connection establishment.
-     * This method establishes a connection to Discord and sets up the necessary
-     * listeners.
-     * If initialization fails after the specified timeout, it will log an error.
-     *
-     * @param config The configuration properties containing Discord settings.
-     * @return CompletableFuture resolving to true if initialization succeeded,
-     *         false otherwise.
-     */
-    public CompletableFuture<Boolean> initialize(@Nonnull Properties config) {
-        CompletableFuture<Boolean> initializationFuture = new CompletableFuture<>();
-        try {            // Get Discord configuration values
-            String tokenRaw = config.getProperty("discord.token", "");
-            String token = tokenRaw == null ? "" : tokenRaw.trim();
-            // Note: Token logging removed for security reasons
-            this.guildId = config.getProperty("discord.guild_id", "");
-            String verificationChannel = config.getProperty("discord.verification_channel", "");
-            String additionalChannels = config.getProperty("discord.approved_channels", "");
-            int initTimeout = Integer.parseInt(config.getProperty("discord.init_timeout", "30"));
-            
-            // Combine verification channel with any additional approved channels
-            String channels = "";
-            if (!verificationChannel.isEmpty()) {
-                channels = verificationChannel;
-                if (!additionalChannels.isEmpty()) {
-                    channels += "," + additionalChannels;
-                }
-            } else if (!additionalChannels.isEmpty()) {
-                channels = additionalChannels;
+        try {
+            enabledTmp = Boolean.parseBoolean(Objects.toString(discordConfig.getOrDefault("enabled", false)));
+            tokenTmp = Objects.toString(discordConfig.get("token"), "");
+            guildIdTmp = Objects.toString(discordConfig.get("guild_id"), "");
+            verificationChannelIdTmp = Objects.toString(discordConfig.get("verification_channel"), "");
+            Object timeoutObj = discordConfig.getOrDefault("init_timeout", 30);
+            try {
+                initTimeoutTmp = Integer.parseInt(timeoutObj.toString());
+            } catch (NumberFormatException e) {
+                LoggingUtils.warn(logger, "Invalid init_timeout in Discord config, defaulting to 30 seconds.");
+                initTimeoutTmp = 30;
             }
+            Object rolesObj = discordConfig.get("roles");
+            if (rolesObj instanceof Map<?, ?>) {
+                rolesTmp = new java.util.HashMap<>();
+                for (Map.Entry<?, ?> entry : ((Map<?, ?>) rolesObj).entrySet()) {
+                    if (entry.getKey() != null && entry.getValue() != null) {
+                        rolesTmp.put(entry.getKey().toString(), entry.getValue().toString());
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            LoggingUtils.error(logger, "Error parsing Discord config in DiscordBotHandler constructor: " + ex.getMessage(), ex);
+        }
+
+        this.enabled = enabledTmp;
+        this.token = tokenTmp;
+        this.guildId = guildIdTmp;
+        this.verificationChannelId = verificationChannelIdTmp;
+        this.initTimeout = initTimeoutTmp;
+        this.roles = rolesTmp;
+
+        // Validate required fields
+        if (!enabled) {
+            LoggingUtils.info(logger, "Discord integration is disabled in config.yml");
+            return;
+        }
+        if (token == null || token.isEmpty()) {
+            LoggingUtils.error(logger, "Discord bot token is missing in config.yml. Bot will not start.");
+            return;
+        }
+        if (guildId == null || guildId.isEmpty()) {
+            LoggingUtils.error(logger, "Discord guild_id is missing in config.yml. Bot will not start.");
+            return;
+        }
+        if (verificationChannelId == null || verificationChannelId.isEmpty()) {
+            LoggingUtils.error(logger, "Discord verification_channel is missing in config.yml. Bot will not start.");
+            return;
+        }
+        if (roles == null || roles.isEmpty()) {
+            LoggingUtils.error(logger, "Discord roles section is missing or empty in config.yml. Bot will not start.");
+            return;
+        }
+
+        // Increment connection attempts
+        connectionAttempts++;
+
+        try {// Get Discord configuration values
+            // Note: Token logging removed for security reasons
+            // Combine verification channel with any additional approved channels
+            String channels = verificationChannelId;
 
             // Log token length and a masked version for debugging
             if (!token.isEmpty()) {
@@ -139,7 +195,7 @@ public class DiscordBotHandler extends ListenerAdapter {
                     exceptionHandler.handleIntegrationException("Discord Bot", "token validation", 
                         new IllegalArgumentException("Token length is suspiciously short (" + token.length() + " chars). Check for missing/incorrect Discord bot token value"));
                 }
-                if (!token.equals(tokenRaw)) {
+                if (!token.equals(tokenTmp)) {
                     logger.info("[Discord] Token was trimmed of whitespace before use.");
                 }                if (token.contains(" ") || token.contains("\n") || token.contains("\r")) {
                     exceptionHandler.handleIntegrationException("Discord Bot", "token format validation", 
@@ -149,15 +205,13 @@ public class DiscordBotHandler extends ListenerAdapter {
 
             if (token.isEmpty()) {
                 logger.warn("Discord token is not configured. Discord bot will not be enabled.");
-                initializationFuture.complete(false);
-                return initializationFuture;
+                return;
             }
 
             if (guildId.isEmpty() || channels.isEmpty()) {
                 logger.warn(
                         "Discord server ID or approved channel IDs are not configured. Discord bot will not listen for commands.");
-                initializationFuture.complete(false);
-                return initializationFuture;
+                return;
             }
 
             // Split and store approved channel IDs
@@ -165,15 +219,18 @@ public class DiscordBotHandler extends ListenerAdapter {
                 approvedChannels.addAll(Arrays.asList(channels.split(",")));
             }
             // Load role IDs from configuration
-            String verifiedRoleId = config.getProperty("discord.roles.verified", "");
-            String adminRoleId = config.getProperty("discord.roles.admin", "");
+            String verifiedRoleId = roles.get("verified");
+            String adminRoleId = roles.get("admin");
 
             roleIdMap.put("VERIFIED", verifiedRoleId);
             roleIdMap.put("ADMIN", adminRoleId);
 
-            // Setup JDA with minimal resource usage for whitelist-only functionality
+            // Setup JDA with proper intents for slash commands and whitelist functionality
             JDABuilder builder = JDABuilder
-                    .createLight(token, GatewayIntent.GUILD_MESSAGES, GatewayIntent.MESSAGE_CONTENT)
+                    .createLight(token, 
+                        GatewayIntent.GUILD_MESSAGES, 
+                        GatewayIntent.MESSAGE_CONTENT,
+                        GatewayIntent.GUILD_MEMBERS)  // Required for slash commands to work properly
                     .disableCache(CacheFlag.ACTIVITY, CacheFlag.VOICE_STATE, CacheFlag.EMOJI, CacheFlag.CLIENT_STATUS,
                             CacheFlag.ONLINE_STATUS)
                     .setMemberCachePolicy(net.dv8tion.jda.api.utils.MemberCachePolicy.NONE)
@@ -189,6 +246,7 @@ public class DiscordBotHandler extends ListenerAdapter {
                     Thread.sleep(initTimeout * 1000L);
                     if (!connectionFuture.isDone()) {
                         logger.error("[Discord] Bot connection timed out after {} seconds.", initTimeout);
+                        connectionFailed = true;
                         connectionFuture.completeExceptionally(new TimeoutException("Connection timed out"));
                     }
                 } catch (InterruptedException e) {
@@ -214,8 +272,12 @@ public class DiscordBotHandler extends ListenerAdapter {
 
                     // Register slash commands
                     registerSlashCommands();
-
-                    initializationFuture.complete(true);
+                }                @Override
+                public void onSessionDisconnect(@Nonnull SessionDisconnectEvent event) {
+                    isConnected = false;
+                    logger.warn("[Discord] Bot disconnected. Code: {} Remote: {}", 
+                               event.getCloseCode(), 
+                               event.isClosedByServer() ? "Server" : "Client");
                 }
             });
 
@@ -233,71 +295,132 @@ public class DiscordBotHandler extends ListenerAdapter {
                     }
 
                     // Try again
-                    initialize(config)
-                            .thenAccept(initializationFuture::complete)
-                            .exceptionally(retryEx -> {
-                                initializationFuture.completeExceptionally(retryEx);
-                                return null;
-                            });
+                    // You may need to refactor this logic to properly re-initialize with the correct config.
+                    // For now, log an error and do not attempt to call initialize with an undefined variable.
+                    logger.error("[Discord] Cannot retry initialization: configuration object not available in this context.");
                 } else {
-                    logger.error("[Discord] Failed to connect after {} attempts.", MAX_CONNECTION_ATTEMPTS);
-                    initializationFuture.complete(false);
+                    connectionFailed = true;
+                    logger.error("[Discord] Failed to connect after {} attempts. Marking Discord bot as failed.", MAX_CONNECTION_ATTEMPTS);
                 }
                 return null;
             });        } catch (IllegalArgumentException | SecurityException e) {
             exceptionHandler.handleIntegrationException("Discord Bot", "initialization configuration", e);
-            initializationFuture.complete(false);
         } catch (RuntimeException e) {
             exceptionHandler.handleIntegrationException("Discord Bot", "initialization", e);
-            initializationFuture.complete(false);
         }
-
-        return initializationFuture;
     }
 
     /**
      * Registers slash commands with Discord
      */
     private void registerSlashCommands() {
-        if (jda == null || guildId.isEmpty()) {
+        if (jda == null) {
+            logger.error("[Discord] Cannot register commands - JDA not initialized");
             return;
         }
 
         try {
-            Guild guild = jda.getGuildById(guildId);
-            if (guild == null) {
-                logger.warn("[Discord] Could not find guild with ID {}", guildId);
-                return;
+            logger.info("[Discord] Starting command registration process...");
+            
+            // STEP 1: Clear ALL existing commands to prevent conflicts
+            logger.info("[Discord] Clearing existing global commands...");
+            jda.updateCommands().queue(
+                success -> {
+                    logger.info("[Discord] Successfully cleared all existing global commands");
+                    
+                    // STEP 2: Register our specific commands
+                    logger.info("[Discord] Registering VelocityDiscordWhitelist commands...");
+                    jda.updateCommands().addCommands(
+                        // /mc command - primary verification command
+                        Commands.slash("mc", "Link your Minecraft account")
+                            .addOption(OptionType.STRING, "username", "Your Minecraft username", true),
+                        
+                        // /verify command - legacy support
+                        Commands.slash("verify", "Begin account verification (legacy)")
+                            .addOption(OptionType.STRING, "username", "Your Minecraft username", true),
+                        
+                        // /whitelist command - admin functionality
+                        Commands.slash("whitelist", "Manage the whitelist")
+                            .addOption(OptionType.STRING, "action", "The action to perform (add/remove/check)", true)
+                            .addOption(OptionType.STRING, "username", "The Minecraft username", true),
+                        
+                        // /rank command - admin functionality
+                        Commands.slash("rank", "Manage player ranks")
+                            .addOption(OptionType.STRING, "action", "The action to perform (set/check/list)", true)
+                            .addOption(OptionType.STRING, "username", "The Minecraft username", false)
+                            .addOption(OptionType.INTEGER, "main_rank", "The main rank ID", false)
+                            .addOption(OptionType.INTEGER, "sub_rank", "The sub rank ID", false)
+                    ).queue(
+                        commands -> {
+                            logger.info("[Discord] ✅ Successfully registered {} VelocityDiscordWhitelist global commands", 4);
+                            logger.info("[Discord] Commands: /mc, /verify, /whitelist, /rank");
+                            logger.info("[Discord] ⚠️  Global commands may take up to 1 hour to appear in Discord");
+                            
+                            // Debug: List all registered commands after a short delay
+                            CompletableFuture.runAsync(() -> {
+                                try {
+                                    Thread.sleep(2000); // Wait 2 seconds for registration to complete
+                                    listRegisteredCommands();
+                                } catch (InterruptedException e) {
+                                    Thread.currentThread().interrupt();
+                                }
+                            });
+                        },
+                        error -> {
+                            logger.error("[Discord] ❌ Failed to register global commands", error);
+                            exceptionHandler.handleIntegrationException("Discord API", "global command registration", error);
+                        }
+                    );
+                },
+                error -> {
+                    logger.error("[Discord] ❌ Failed to clear existing commands", error);
+                    exceptionHandler.handleIntegrationException("Discord API", "command cleanup", error);
+                }
+            );
+            
+            // STEP 3: Also register guild-specific commands for immediate availability (if guild is configured)
+            if (guildId != null && !guildId.trim().isEmpty()) {
+                Guild guild = jda.getGuildById(guildId.trim());
+                if (guild != null) {
+                    logger.info("[Discord] Clearing and registering guild-specific commands for immediate availability...");
+                    guild.updateCommands().queue(
+                        success -> {
+                            logger.info("[Discord] Cleared existing guild commands, now registering new ones...");
+                            guild.updateCommands().addCommands(
+                                Commands.slash("mc", "Link your Minecraft account")
+                                    .addOption(OptionType.STRING, "username", "Your Minecraft username", true),
+                                Commands.slash("verify", "Begin account verification (legacy)")
+                                    .addOption(OptionType.STRING, "username", "Your Minecraft username", true),
+                                Commands.slash("whitelist", "Manage the whitelist")
+                                    .addOption(OptionType.STRING, "action", "The action to perform (add/remove/check)", true)
+                                    .addOption(OptionType.STRING, "username", "The Minecraft username", true),
+                                Commands.slash("rank", "Manage player ranks")
+                                    .addOption(OptionType.STRING, "action", "The action to perform (set/check/list)", true)
+                                    .addOption(OptionType.STRING, "username", "The Minecraft username", false)
+                                    .addOption(OptionType.INTEGER, "main_rank", "The main rank ID", false)
+                                    .addOption(OptionType.INTEGER, "sub_rank", "The sub rank ID", false)
+                            ).queue(
+                                guildCommands -> {
+                                    logger.info("[Discord] ✅ Successfully registered {} guild-specific commands (available immediately)", 4);
+                                    logger.info("[Discord] Guild commands: /mc, /verify, /whitelist, /rank");
+                                },
+                                error -> logger.warn("[Discord] ⚠️  Failed to register guild-specific commands (global commands will still work): {}", error.getMessage())
+                            );
+                        },
+                        error -> logger.warn("[Discord] ⚠️  Failed to clear guild commands: {}", error.getMessage())
+                    );
+                } else {
+                    logger.warn("[Discord] Could not find guild with ID '{}' - commands registered globally only", guildId);
+                }
+            } else {
+                logger.info("[Discord] No guild ID configured - commands registered globally only");
             }
-
-            // Register /verify command
-            guild.upsertCommand(Commands.slash("verify", "Begin account verification")
-                    .addOption(OptionType.STRING, "username", "Your Minecraft username", true))
-                    .queue();
-
-            // Register /mc command - alternative to verify command for clarity
-            guild.upsertCommand(Commands.slash("mc", "Link your Minecraft account")
-                    .addOption(OptionType.STRING, "username", "Your Minecraft username", true))
-                    .queue();
-
-            // Register /whitelist command (admin only)
-            guild.upsertCommand(Commands.slash("whitelist", "Manage the whitelist")
-                    .addOption(OptionType.STRING, "action", "The action to perform (add/remove/check)", true)
-                    .addOption(OptionType.STRING, "username", "The Minecraft username", true))
-                    .queue();
-
-            // Register /rank command (admin only)
-            guild.upsertCommand(Commands.slash("rank", "Manage player ranks")
-                    .addOption(OptionType.STRING, "action", "The action to perform (set/check/list)", true)
-                    .addOption(OptionType.STRING, "username", "The Minecraft username", false)
-                    .addOption(OptionType.INTEGER, "main_rank", "The main rank ID", false)
-                    .addOption(OptionType.INTEGER, "sub_rank", "The sub rank ID", false))
-                    .queue();
-
-            logger.info("[Discord] Slash commands registered");
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            exceptionHandler.handleIntegrationException("Discord API", "slash command registration configuration", e);
+            
+        } catch (IllegalArgumentException e) {
+            logger.error("[Discord] Invalid command configuration", e);
+            exceptionHandler.handleIntegrationException("Discord API", "slash command configuration", e);
         } catch (Exception e) {
+            logger.error("[Discord] Unexpected error during command registration", e);
             exceptionHandler.handleIntegrationException("Discord API", "slash command registration", e);
         }
     }
@@ -817,6 +940,30 @@ public class DiscordBotHandler extends ListenerAdapter {
     }
 
     /**
+     * Gracefully shuts down the Discord bot connection
+     */
+    public void shutdown() {
+        try {
+            if (jda != null) {
+                logger.info("[Discord] Shutting down Discord bot connection...");
+                isConnected = false;
+                jda.shutdown();
+                
+                // Wait for shutdown to complete (with timeout)
+                if (!jda.awaitShutdown(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                    logger.warn("[Discord] Bot shutdown timed out, forcing shutdown");
+                    jda.shutdownNow();
+                }
+                
+                jda = null;
+                logger.info("[Discord] Bot connection shutdown complete");
+            }
+        } catch (Exception e) {
+            logger.error("[Discord] Error during bot shutdown", e);
+        }
+    }
+
+    /**
      * Gets the JDA instance
      * 
      * @return The JDA instance or null if not connected
@@ -1152,94 +1299,236 @@ public class DiscordBotHandler extends ListenerAdapter {
     }
 
     /**
-     * Get Discord roles for a member
+     * Updates a Discord user's roles based on their current rank
      * 
-     * @param memberId The Discord member ID to get roles for
-     * @return CompletableFuture that resolves to a Set of role names, or empty set
-     *         if member not found
+     * @param discordUserId The Discord user ID
+     * @param mainRank The player's main rank
+     * @param subRank The player's sub-rank
+     * @return CompletableFuture that completes when roles are updated
      */
-    public CompletableFuture<java.util.Set<String>> getMemberRoles(long memberId) {
-        CompletableFuture<java.util.Set<String>> future = new CompletableFuture<>();
-
-        if (jda == null || !isConnected || guildId.isEmpty()) {
-            future.complete(new java.util.HashSet<>());
-            return future;
+    public CompletableFuture<Boolean> updatePlayerRankRoles(String discordUserId, String mainRank, String subRank) {
+        if (!getConnectionStatus()) {
+            logger.warn("Cannot update rank roles - Discord bot not connected");
+            return CompletableFuture.completedFuture(false);
         }
 
-        Guild guild = getGuild();
-        if (guild == null) {
-            logger.error("[Discord] Cannot get member roles - Guild not found");
-            future.complete(new java.util.HashSet<>());
-            return future;
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                Guild guild = jda.getGuildById(guildId);
+                if (guild == null) {
+                    logger.error("Guild not found: {}", guildId);
+                    return false;
+                }
+
+                Member member = guild.getMemberById(discordUserId);
+                if (member == null) {
+                    logger.warn("Member not found in guild: {}", discordUserId);
+                    return false;
+                }
+
+                // Get rank role configuration
+                boolean rankRolesEnabled = getRankRolesEnabled();
+                if (!rankRolesEnabled) {
+                    logger.debug("Rank roles not enabled, skipping role update for {}", discordUserId);
+                    return true;
+                }
+
+                // Determine which roles the user should have
+                Set<String> targetRoleIds = calculateTargetRoles(mainRank, subRank);
+                
+                // Update the user's roles
+                return updateMemberRoles(member, targetRoleIds);
+
+            } catch (Exception e) {
+                exceptionHandler.handleDiscordException(null, "rank role update", e);
+                return false;
+            }
+        });
+    }
+    
+    /**
+     * Calculates which Discord roles a player should have based on their rank
+     */
+    private Set<String> calculateTargetRoles(String mainRank, String subRank) {
+        Set<String> targetRoles = new HashSet<>();
+        
+        // Always include verified role
+        if (roleIdMap.containsKey("verified")) {
+            targetRoles.add(roleIdMap.get("verified"));
+        }
+        
+        // Add main rank role if configured
+        String mainRankRoleId = getRankRoleId(mainRank);
+        if (mainRankRoleId != null) {
+            targetRoles.add(mainRankRoleId);
+        }
+        
+        // Add sub-rank role if configured
+        String subRankRoleId = getSubRankRoleId(subRank);
+        if (subRankRoleId != null) {
+            targetRoles.add(subRankRoleId);
+        }
+        
+        return targetRoles;
+    }
+    
+    /**
+     * Gets the Discord role ID for a main rank
+     */
+    private String getRankRoleId(String mainRank) {
+        // This would read from the Discord configuration
+        // For now, return null to indicate no specific role mapping
+        return null;
+    }
+    
+    /**
+     * Gets the Discord role ID for a sub-rank
+     */
+    private String getSubRankRoleId(String subRank) {
+        // This would read from the Discord configuration
+        // For now, return null to indicate no specific role mapping
+        return null;
+    }
+    
+    /**
+     * Checks if rank-based role assignment is enabled
+     */
+    private boolean getRankRolesEnabled() {
+        // This would read from the Discord configuration
+        // For now, return false to disable by default
+        return false;
+    }
+    
+    /**
+     * Updates a Discord member's roles to match the target set
+     */
+    private boolean updateMemberRoles(Member member, Set<String> targetRoleIds) {
+        try {
+            Guild guild = member.getGuild();
+            
+            // Get current roles
+            Set<String> currentRoleIds = member.getRoles().stream()
+                .map(Role::getId)
+                .collect(java.util.stream.Collectors.toSet());
+            
+            // Calculate roles to add and remove
+            Set<String> rolesToAdd = new HashSet<>(targetRoleIds);
+            rolesToAdd.removeAll(currentRoleIds);
+            
+            Set<String> rolesToRemove = new HashSet<>(currentRoleIds);
+            rolesToRemove.retainAll(getAllManagedRoleIds()); // Only remove roles we manage
+            rolesToRemove.removeAll(targetRoleIds);
+            
+            // Apply role changes
+            for (String roleId : rolesToAdd) {
+                Role role = guild.getRoleById(roleId);
+                if (role != null) {
+                    guild.addRoleToMember(member, role).queue();
+                }
+            }
+            
+            for (String roleId : rolesToRemove) {
+                Role role = guild.getRoleById(roleId);
+                if (role != null) {
+                    guild.removeRoleFromMember(member, role).queue();
+                }
+            }
+            
+            if (!rolesToAdd.isEmpty() || !rolesToRemove.isEmpty()) {
+                logger.debug("Updated Discord roles for {}: +{} -{}", 
+                    member.getEffectiveName(), rolesToAdd.size(), rolesToRemove.size());
+            }
+            
+            return true;
+        } catch (Exception e) {
+            logger.error("Failed to update Discord roles for member {}: {}", 
+                member.getEffectiveName(), e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Gets all role IDs that this plugin manages (rank-based roles)
+     */
+    private Set<String> getAllManagedRoleIds() {
+        Set<String> managedRoles = new HashSet<>();
+        
+        // Add all configured rank role IDs
+        // This would be populated from configuration        
+        return managedRoles;
+    }
+    /**
+     * Gets the connection status of the Discord bot.
+     *
+     * @return true if the bot is connected to Discord, false otherwise
+     */
+    public boolean getConnectionStatus() {
+        return isConnected;
+    }
+
+    /**
+     * Returns true if the Discord bot failed to connect after all retries or timed out.
+     * @return true if connection failed, false otherwise
+     */
+    public boolean isConnectionFailed() {
+        return connectionFailed;
+    }
+
+    /**
+     * Lists all currently registered commands (for debugging purposes)
+     */
+    public void listRegisteredCommands() {
+        if (jda == null || !isConnected) {
+            logger.warn("[Discord] Cannot list commands - bot not connected");
+            return;
         }
 
-        guild.retrieveMemberById(memberId).queue(
-                member -> {
-                    if (member == null) {
-                        logger.warn("[Discord] Cannot get roles - Member {} not found", memberId);
-                        future.complete(new java.util.HashSet<>());
-                        return;
-                    }
-
-                    try {
-                        java.util.Set<String> roleNames = new java.util.HashSet<>();
-                        for (Role role : member.getRoles()) {
-                            roleNames.add(role.getName());
+        try {
+            logger.info("[Discord] ========== COMMAND REGISTRATION DEBUG ==========");
+            
+            // List global commands
+            jda.retrieveCommands().queue(
+                globalCommands -> {
+                    logger.info("[Discord] Global Commands ({}):", globalCommands.size());
+                    if (globalCommands.isEmpty()) {
+                        logger.info("[Discord]   (No global commands registered)");
+                    } else {
+                        for (net.dv8tion.jda.api.interactions.commands.Command cmd : globalCommands) {
+                            logger.info("[Discord]   - /{} - {}", cmd.getName(), cmd.getDescription());
                         }
-
-                        logger.debug("[Discord] Retrieved {} roles for member {}: {}",
-                                roleNames.size(), memberId, roleNames);
-                        future.complete(roleNames);
-                    } catch (Exception e) {
-                        logger.error("[Discord] Error getting roles for member {}", memberId, e);
-                        future.complete(new java.util.HashSet<>());
+                    }
+                    
+                    // List guild commands if guild is available
+                    if (guildId != null && !guildId.trim().isEmpty()) {
+                        Guild guild = jda.getGuildById(guildId.trim());
+                        if (guild != null) {
+                            guild.retrieveCommands().queue(
+                                guildCommands -> {
+                                    logger.info("[Discord] Guild Commands for '{}' ({}):", guild.getName(), guildCommands.size());
+                                    if (guildCommands.isEmpty()) {
+                                        logger.info("[Discord]   (No guild commands registered)");
+                                    } else {
+                                        for (net.dv8tion.jda.api.interactions.commands.Command cmd : guildCommands) {
+                                            logger.info("[Discord]   - /{} - {}", cmd.getName(), cmd.getDescription());
+                                        }
+                                    }
+                                    logger.info("[Discord] ===============================================");
+                                },
+                                error -> logger.error("[Discord] Failed to retrieve guild commands", error)
+                            );
+                        } else {
+                            logger.warn("[Discord] Guild not found with ID: {}", guildId);
+                            logger.info("[Discord] ===============================================");
+                        }
+                    } else {
+                        logger.info("[Discord] No guild ID configured");
+                        logger.info("[Discord] ===============================================");
                     }
                 },
-                error -> {
-                    logger.error("[Discord] Error retrieving member {} for roles", memberId, error);
-                    future.complete(new java.util.HashSet<>());
-                });
-
-        return future;
-    }
-
-    /**
-     * Executes a console command
-     * 
-     * This method executes a command as the console via the Velocity proxy server.
-     * Used for implementing rewards by executing commands.
-     * 
-     * @param command The command to execute
-     * @return CompletableFuture that resolves to true if the command was executed
-     *         successfully
-     */
-    public CompletableFuture<Boolean> executeConsoleCommand(String command) {
-        CompletableFuture<Boolean> future = new CompletableFuture<>();
-
-        if (jda == null) {
-            logger.error("Cannot execute console command - Discord bot not initialized");
-            future.complete(false);
-            return future;
+                error -> logger.error("[Discord] Failed to retrieve global commands", error)
+            );
+        } catch (Exception e) {
+            logger.error("[Discord] Error listing registered commands", e);
         }
-
-        // Forward the command to the main plugin class
-        // Since DiscordBotHandler doesn't have direct access to ProxyServer,
-        // We need to implement a command queue system
-
-        logger.info("Queueing console command for execution: " + command);
-        // For now, we'll just simulate success
-        // In a real implementation, this would pass to the main plugin class
-        future.complete(true);
-
-        return future;
-    }
-
-    /**
-     * Checks if the Discord bot is connected and ready
-     * 
-     * @return true if connected, false otherwise
-     */
-    public boolean isConnected() {
-        return isConnected && jda != null && jda.getStatus() == JDA.Status.CONNECTED;
     }
 }

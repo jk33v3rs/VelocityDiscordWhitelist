@@ -1,29 +1,71 @@
-# User-specific stuff
-.idea/
+# Build outputs
+build/
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
 
+# IDE files
+.idea/
+.vscode/
 *.iml
-*.ipr
 *.iws
+*.ipr
+.project
+.classpath
+.settings/
 
 # IntelliJ
 out/
-# mpeltonen/sbt-idea plugin
 .idea_modules/
-
-# JIRA plugin
 atlassian-ide-plugin.xml
 
-# Compiled class file
-*.class
+# OS files
+.DS_Store
+Thumbs.db
+*.tmp
+*.temp
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
 
-# Log file
+# Logs
+logs/
 *.log
+*.log.*
 
-# BlueJ files
+# Runtime configuration and data
+config.yaml
+messages.yaml
+data/
+backups/
+
+# Gradle
+.gradle/
+gradle-app.setting
+
+# Local development
+local.properties
+test-config.yaml
+
+# Plugin runtime
+whitelist.db
+plugins/VelocityDiscordWhitelist-*.jar
+
+# Python scripts (achievement parsers)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Compiled class files
+*.class
 *.ctxt
 
-# Package Files #
-*.jar
+# Package Files
 *.war
 *.nar
 *.ear
@@ -31,22 +73,17 @@ atlassian-ide-plugin.xml
 *.tar.gz
 *.rar
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+# JVM crash logs
 hs_err_pid*
 
-*~
+# Temporary files
+*.swp
+*.swo
+.tmp
+.cache
 
-# temporary files which can be created if a process still has a handle open of a deleted file
-.fuse_hidden*
-
-# KDE directory preferences
-.directory
-
-# Linux trash folder which might appear on any partition or disk
-.Trash-*
-
-# .nfs files are created when an open file is removed but is still being accessed
-.nfs*
+# Analysis documentation (uncomment to exclude from repository)
+# docs/analysis/
 
 # General
 .DS_Store
@@ -154,10 +191,15 @@ config.yaml
 *.env
 .env*
 
-# Documentation and notes (keeping only essential docs)
+# Documentation and notes (organized structure maintained)
 *.md.backup
 notes/
 docs/draft/
+docs/temp/
+
+# Analysis documentation (generated during development)
+docs/analysis/cleanup-*.md
+docs/analysis/temp-*.md
 
 # Placeholder files in development (to be whitelisted as they're completed)
 # API Interfaces

@@ -1,0 +1,33 @@
+# VelocityDiscordWhitelist TODO List
+
+- Add detailed function headers (purpose, params, return) to all methods, per your coding standards.
+- Ensure all error handling uses the ExceptionHandler and logs sufficient detail.
+- Use camelCase for variables/functions, PascalCase for classes, UPPER_CASE for constants.
+- Avoid exposing sensitive info in logs or error messages.
+- Add more granular startup status reporting (e.g., which subsystem failed, not just "plugin failed").
+- Ensure all async operations (especially Discord and SQL) have timeouts and surface failures in the status report.
+- Add runtime diagnostics (e.g., `/discordstatus` command) for admins to check bot health.
+- Ensure all Discord event listeners are registered/unregistered cleanly on plugin enable/disable.
+- Document all Discord command flows and error cases in the code and in project docs.
+- Refactor repeated query logic into reusable private methods.
+- Add more detailed SQL error logging (e.g., include query and parameters, but redact sensitive info).
+- Add connection health checks and auto-reconnect logic.
+- Add more detailed logging for purgatory state transitions (entry, exit, timeout, blacklist).
+- Expose purgatory state to admins via a command or status page.
+- Ensure all edge cases (e.g., server restart during purgatory) are handled gracefully. For example, in the case of a server crash, check to see if there are any out-of-time purgatory sessions and clean them up on startup so that players can simply restart their timed purgatory session by going back to discord and sending /mc <playername> in the relevant channel(s) again.
+- Document the full rank progression system in project docs for maintainability.
+- `/reload` command in `BrigadierCommandHandler` is a placeholder—needs real config reload logic.
+- Implement async config reload for `/reload`, with proper locking and error feedback.
+- Add usage examples and error case documentation for all commands.
+- Add permission checks and rate limiting for admin commands.
+- Document integration requirements and setup in project docs.
+- Ensure all exceptions are routed through the ExceptionHandler for consistency.
+- Add log levels (INFO, WARN, ERROR) and make them configurable in config.yaml.
+- Document logging and error handling strategy in project docs.
+- Add Javadoc headers to all model classes and fields for clarity.
+- Make models immutable where possible for thread safety.
+- Document model relationships and usage in project docs.
+- Document all config options and defaults in project docs.
+- Keep all documentation in sync with code changes, especially for new features or refactors.
+- Add a "troubleshooting" section to the README for common issues.
+- Generate a Javadoc or similar API docs for public classes/methods.

@@ -210,12 +210,11 @@ public class PlayerRank {
         
         return true; // All data is valid or was corrected
     }
-    
-    /**
+      /**
      * Gets a formatted display string for this player's rank
      * Uses the official subrank and main rank progression systems
      * 
-     * @return The formatted rank string (e.g., "novice bystander")
+     * @return The formatted rank string in "subrank mainrank" format (e.g., "novice bystander")
      */
     public String getFormattedRank() {
         return RankDefinition.formatRankDisplay(subRank, mainRank);

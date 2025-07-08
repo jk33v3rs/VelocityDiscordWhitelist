@@ -372,4 +372,107 @@ public class VaultIntegration {
             return true;
         }, false);
     }
+    
+    /**
+     * Calculates and gives rank progression rewards based on the correct rank system
+     * 
+     * @param playerName The name of the player
+     * @param playerUuid The UUID of the player
+     * @param mainRank The player's main rank (1-25)
+     * @param subRank The player's sub-rank (1-7)
+     * @param previousMainRank Previous main rank for milestone calculation
+     * @return CompletableFuture that completes when the reward is given
+     */
+    @SuppressWarnings("unchecked")
+    public CompletableFuture<Boolean> giveRankProgressionReward(String playerName, UUID playerUuid, 
+                                                               String mainRank, String subRank, String previousMainRank) {
+        if (!isEconomyAvailable()) {
+            debugLog("Economy not available for rank progression reward: " + playerName);
+            return CompletableFuture.completedFuture(false);
+        }
+
+        return CompletableFuture.supplyAsync(() -> {
+            return exceptionHandler.executeWithHandling("Rank progression reward for " + playerName, () -> {
+                Map<String, Object> vaultConfig = (Map<String, Object>) config.getOrDefault("vault", Map.of());
+                Map<String, Object> economyConfig = (Map<String, Object>) vaultConfig.getOrDefault("economy", Map.of());
+                
+                // Calculate base reward
+                double baseReward = Double.parseDouble(economyConfig.getOrDefault("rank_base_reward", "500").toString());
+                double subrankMultiplier = Double.parseDouble(economyConfig.getOrDefault("subrank_multiplier", "0.5").toString());
+                double mainrankMultiplier = Double.parseDouble(economyConfig.getOrDefault("mainrank_multiplier", "2.0").toString());
+                
+                // Calculate rank position (1-175 total positions)
+                int mainRankIndex = getMainRankIndex(mainRank);
+                int subRankIndex = getSubRankIndex(subRank);
+                
+                // Calculate reward based on rank progression
+                double calculatedReward = baseReward * Math.pow(mainrankMultiplier, mainRankIndex) * (1 + (subRankIndex * subrankMultiplier));
+                
+                // Check for milestone bonuses
+                double milestoneBonus = getMilestoneBonus(mainRank, economyConfig);
+                double totalReward = calculatedReward + milestoneBonus;
+                
+                // Send command to backend server to give reward
+                String command = String.format("eco give %s %f", playerName, totalReward);
+                boolean success = executeServerCommand(command, "Rank progression reward for " + playerName);
+                
+                if (success) {
+                    debugLog(String.format("Gave rank progression reward to %s: %f (Base: %f, Milestone: %f)", 
+                        playerName, totalReward, calculatedReward, milestoneBonus));
+                    return true;
+                } else {
+                    logger.error("Failed to give rank progression reward to player {}", playerName);
+                    return false;
+                }
+            }, false);
+        });
+    }
+    
+    /**
+     * Gets the index of a main rank (0-24) based on the correct rank system
+     */
+    private int getMainRankIndex(String mainRank) {
+        String[] mainRanks = {
+            "bystander", "onlooker", "wanderer", "traveller", "explorer",
+            "adventurer", "surveyor", "navigator", "journeyman", "pathfinder",
+            "trailblazer", "pioneer", "craftsman", "specialist", "artisan",
+            "veteran", "sage", "luminary", "titan", "legend",
+            "eternal", "ascendant", "celestial", "divine", "deity"
+        };
+        
+        for (int i = 0; i < mainRanks.length; i++) {
+            if (mainRanks[i].equalsIgnoreCase(mainRank)) {
+                return i;
+            }
+        }
+        return 0; // Default to first rank
+    }
+    
+    /**
+     * Gets the index of a sub-rank (0-6) based on the correct rank system
+     */
+    private int getSubRankIndex(String subRank) {
+        String[] subRanks = {"novice", "apprentice", "adept", "master", "heroic", "mythic", "immortal"};
+        
+        for (int i = 0; i < subRanks.length; i++) {
+            if (subRanks[i].equalsIgnoreCase(subRank)) {
+                return i;
+            }
+        }
+        return 0; // Default to first sub-rank
+    }
+    
+    /**
+     * Calculates milestone bonus for achieving certain main ranks
+     */
+    @SuppressWarnings("unchecked")
+    private double getMilestoneBonus(String mainRank, Map<String, Object> economyConfig) {
+        Map<String, Object> milestoneBonuses = (Map<String, Object>) economyConfig.getOrDefault("milestone_bonuses", Map.of());
+        
+        if (milestoneBonuses.containsKey(mainRank)) {
+            return Double.parseDouble(milestoneBonuses.get(mainRank).toString());
+        }
+        
+        return 0.0; // No milestone bonus for this rank
+    }
 }

@@ -1,0 +1,1424 @@
+{
+  "metadata": {
+    "version": "1.17.0",
+    "description": "BlazeandCaves Advancements Pack Achievement Configuration for XP and Rewards System",
+    "last_updated": "2025-06-21",
+    "total_achievements": 1000,
+    "categories": [
+      "Adventure", "Animals", "Biomes", "Building", "Enchanting", 
+      "End", "Farming", "Mining", "Monsters", "Nether", 
+      "Potions", "Redstone", "Statistics", "Super Challenges", 
+      "Terralith", "Weaponry", "Introduction"
+    ]
+  },
+  "difficulty_multipliers": {
+    "easy": 1.0,
+    "medium": 1.5,
+    "hard": 2.0,
+    "extreme": 3.0,
+    "insane": 5.0
+  },
+  "category_multipliers": {
+    "adventure": 1.0,
+    "animals": 1.0,
+    "biomes": 1.2,
+    "building": 0.8,
+    "enchanting": 1.3,
+    "end": 2.0,
+    "farming": 0.9,
+    "mining": 1.1,
+    "monsters": 1.4,
+    "nether": 1.8,
+    "potions": 1.2,
+    "redstone": 1.1,
+    "statistics": 0.7,
+    "super_challenges": 5.0,
+    "terralith": 1.5,
+    "weaponry": 1.3,
+    "introduction": 0.5
+  },
+  "achievements": {
+    "blazeandcave:adventure/adventure": {
+      "display_name": "Adventure",
+      "category": "adventure",
+      "base_xp": 0,
+      "difficulty": "easy",
+      "description": "Village, pillage and exploration",
+      "parent": null,
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:adventure/i_hereby_dub_thee": {
+      "display_name": "I hereby dub thee...",
+      "category": "adventure",
+      "base_xp": 10,
+      "difficulty": "easy",
+      "description": "Obtain a name tag",
+      "parent": "blazeandcave:adventure/adventure",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:adventure/i_just_want_to_make_toast": {
+      "display_name": "I just want to make toast!",
+      "category": "adventure",
+      "base_xp": 15,
+      "difficulty": "easy",
+      "description": "Name a bunny 'Toast'",
+      "parent": "blazeandcave:adventure/i_hereby_dub_thee",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:rabbit_foot:1", "minecraft:name_tag:1"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:adventure/whats_up_doc": {
+      "display_name": "What's Up, Doc?",
+      "category": "adventure",
+      "base_xp": 20,
+      "difficulty": "easy",
+      "description": "Turn a mob upside-down",
+      "parent": "blazeandcave:adventure/i_just_want_to_make_toast",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:name_tag:1"],
+        "trophy": "dinnerbone_head"
+      }
+    },
+    "blazeandcave:adventure/nyan_sheep": {
+      "display_name": "Nyan Sheep",
+      "category": "adventure",
+      "base_xp": 20,
+      "difficulty": "easy",
+      "description": "Nyan Nyan Nyan Nyan...",
+      "parent": "blazeandcave:adventure/whats_up_doc",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:name_tag:1"],
+        "trophy": "jeb_head"
+      }
+    },
+    "blazeandcave:adventure/slenderman": {
+      "display_name": "Slenderman",
+      "category": "adventure",
+      "base_xp": 25,
+      "difficulty": "medium",
+      "description": "Defeat this terrifying monster",
+      "parent": "blazeandcave:adventure/nyan_sheep",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:name_tag:1", "minecraft:ender_pearl:3"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:adventure/the_one_and_true_johnny": {
+      "display_name": "The one and true Johnny",
+      "category": "adventure",
+      "base_xp": 30,
+      "difficulty": "medium",
+      "description": "Defeat Johnny",
+      "parent": "blazeandcave:adventure/slenderman",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:name_tag:1", "minecraft:emerald:3"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:adventure/nerds_never_die": {
+      "display_name": "Nerds Never Die",
+      "category": "adventure",
+      "base_xp": 100,
+      "difficulty": "hard",
+      "description": "Name a Piglin Brute 'Technoblade'",
+      "parent": "blazeandcave:adventure/the_one_and_true_johnny",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": "crown_of_the_potato_king"
+      }
+    },
+    "blazeandcave:adventure/beethoven": {
+      "display_name": "Beethoven",
+      "category": "adventure",
+      "base_xp": 15,
+      "difficulty": "easy",
+      "description": "Craft a jukebox with planks and a diamond",
+      "parent": "blazeandcave:adventure/i_hereby_dub_thee",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:diamond:1"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:adventure/music_to_my_ears": {
+      "display_name": "Music To My Ears",
+      "category": "adventure",
+      "base_xp": 10,
+      "difficulty": "easy",
+      "description": "Play a music disc in a jukebox",
+      "parent": "blazeandcave:adventure/beethoven",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:adventure/the_sound_of_music": {
+      "display_name": "The Sound of Music",
+      "category": "adventure",
+      "base_xp": 25,
+      "difficulty": "easy",
+      "description": "Make the Meadows come alive with the sound of music from a jukebox",
+      "parent": "blazeandcave:adventure/music_to_my_ears",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:adventure/disc_jockey": {
+      "display_name": "Disc Jockey",
+      "category": "adventure",
+      "base_xp": 250,
+      "difficulty": "hard",
+      "description": "Listen to all the music discs",
+      "parent": "blazeandcave:adventure/the_sound_of_music",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:adventure/overpowered": {
+      "display_name": "Overpowered",
+      "category": "adventure",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Obtain a Notch Apple",
+      "parent": "blazeandcave:adventure/disc_jockey",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:adventure/now_youre_thinking_with_portals": {
+      "display_name": "Now You're Thinking With Portals",
+      "category": "adventure",
+      "base_xp": 20,
+      "difficulty": "easy",
+      "description": "Find a broken Nether Portal in the Overworld",
+      "parent": "blazeandcave:adventure/adventure",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:adventure/grave_robber": {
+      "display_name": "Grave Robber",
+      "category": "adventure",
+      "base_xp": 25,
+      "difficulty": "easy",
+      "description": "Enter a pyramid in a desert",
+      "parent": "blazeandcave:adventure/now_youre_thinking_with_portals",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:adventure/tomb_raider": {
+      "display_name": "Tomb Raider",
+      "category": "adventure",
+      "base_xp": 25,
+      "difficulty": "easy",
+      "description": "Enter a jungle temple",
+      "parent": "blazeandcave:adventure/grave_robber",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:adventure/witchcraft": {
+      "display_name": "Witchcraft",
+      "category": "adventure",
+      "base_xp": 25,
+      "difficulty": "easy",
+      "description": "Find a witch hut in a swamp",
+      "parent": "blazeandcave:adventure/tomb_raider",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:adventure/secret_of_the_igloo": {
+      "display_name": "Secret of the Igloo",
+      "category": "adventure",
+      "base_xp": 25,
+      "difficulty": "easy",
+      "description": "Find an igloo in a snowy tundra",
+      "parent": "blazeandcave:adventure/witchcraft",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:adventure/raidin_master": {
+      "display_name": "Raidin' Master",
+      "category": "adventure",
+      "base_xp": 100,
+      "difficulty": "hard",
+      "description": "Discover every structure type",
+      "parent": "blazeandcave:adventure/secret_of_the_igloo",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:adventure/brushed_away": {
+      "display_name": "Brushed Away",
+      "category": "adventure",
+      "base_xp": 15,
+      "difficulty": "easy",
+      "description": "Craft a Brush using a feather, copper and a stick",
+      "parent": "blazeandcave:adventure/grave_robber",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:adventure/respecting_the_remnants": {
+      "display_name": "Respecting the Remnants",
+      "category": "adventure",
+      "base_xp": 30,
+      "difficulty": "medium",
+      "description": "Using a Brush, carefully excavate a Pottery Sherd from a suspicious block",
+      "parent": "blazeandcave:adventure/brushed_away",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:adventure/careful_restoration": {
+      "display_name": "Careful Restoration",
+      "category": "adventure",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Put together a Decorated Pot using four Pottery Sherds",
+      "parent": "blazeandcave:adventure/respecting_the_remnants",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:adventure/pottery_exhibition": {
+      "display_name": "Pottery Exhibition",
+      "category": "adventure",
+      "base_xp": 200,
+      "difficulty": "hard",
+      "description": "Find one of each type of Pottery Shard throughout your archeology expeditions",
+      "parent": "blazeandcave:adventure/careful_restoration",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": "golden_idol"
+      }
+    },
+    "blazeandcave:adventure/a_suspicious_advancement": {
+      "display_name": "A Suspicious Advancement",
+      "category": "adventure",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Obtain a block of Suspicious Sand or Gravel",
+      "parent": "blazeandcave:adventure/careful_restoration",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:adventure/sus": {
+      "display_name": "sus",
+      "category": "adventure",
+      "base_xp": 505,
+      "difficulty": "extreme",
+      "description": "Obtain a stack of Suspicious Sand and Gravel",
+      "parent": "blazeandcave:adventure/a_suspicious_advancement",
+      "hidden": true,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:animals/animals": {
+      "display_name": "Animals",
+      "category": "animals",
+      "base_xp": 0,
+      "difficulty": "easy",
+      "description": "The world is full of friends and food",
+      "parent": null,
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:animals/bacon": {
+      "display_name": "Bacon!",
+      "category": "animals",
+      "base_xp": 10,
+      "difficulty": "easy",
+      "description": "Gotta kill this pig pig pig pig!",
+      "parent": "blazeandcave:animals/animals",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:porkchop:2"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:animals/pork_chop": {
+      "display_name": "Pork Chop",
+      "category": "animals",
+      "base_xp": 15,
+      "difficulty": "easy",
+      "description": "You know kung fu, how about pork chop?",
+      "parent": "blazeandcave:animals/bacon",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:cooked_porkchop:2"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:animals/when_pigs_used_to_fly": {
+      "display_name": "When Pigs Used to Fly",
+      "category": "animals",
+      "base_xp": 20,
+      "difficulty": "easy",
+      "description": "Craft a carrot on a stick so you can ride a pig off a cliff.",
+      "parent": "blazeandcave:animals/pork_chop",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:carrot:4"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:animals/pig_slaughterer": {
+      "display_name": "Pig Slaughterer",
+      "category": "animals",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Collect a stack of raw porkchops",
+      "parent": "blazeandcave:animals/when_pigs_used_to_fly",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:porkchop:8"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:animals/swine_sailing": {
+      "display_name": "Swine Sailing",
+      "category": "animals",
+      "base_xp": 50,
+      "difficulty": "hard",
+      "description": "Ride a saddled pig in a boat in a minecart",
+      "parent": "blazeandcave:animals/pig_slaughterer",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:carrot:16"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:mining/mining": {
+      "display_name": "Mining",
+      "category": "mining",
+      "base_xp": 10,
+      "difficulty": "easy",
+      "description": "Dig deep down, mine up ore",
+      "parent": null,
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:mining/stone_age": {
+      "display_name": "Stone Age",
+      "category": "mining",
+      "base_xp": 15,
+      "difficulty": "easy",
+      "description": "Mine stone with your new pickaxe",
+      "parent": "blazeandcave:mining/mining",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:cobblestone:3"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:building/building": {
+      "display_name": "Building",
+      "category": "building",
+      "base_xp": 0,
+      "difficulty": "easy",
+      "description": "Place blocks and build magnificent structures",
+      "parent": null,
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:building/house_of_blocks": {
+      "display_name": "House of Blocks",
+      "category": "building",
+      "base_xp": 10,
+      "difficulty": "easy",
+      "description": "Place 100 blocks",
+      "parent": "blazeandcave:building/building",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:weaponry/weaponry": {
+      "display_name": "Weaponry",
+      "category": "weaponry",
+      "base_xp": 0,
+      "difficulty": "easy",
+      "description": "Weapons of choice for combat",
+      "parent": null,
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:weaponry/take_aim": {
+      "display_name": "Take Aim",
+      "category": "weaponry",
+      "base_xp": 10,
+      "difficulty": "easy",
+      "description": "Shoot something with a bow and arrow",
+      "parent": "blazeandcave:weaponry/weaponry",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:arrow:8"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:end/the_end": {
+      "display_name": "The End",
+      "category": "end",
+      "base_xp": 15,
+      "difficulty": "easy",
+      "description": "Or the beginning?",
+      "parent": null,
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:end/free_the_end": {
+      "display_name": "Free the End",
+      "category": "end",
+      "base_xp": 100,
+      "difficulty": "hard",
+      "description": "Good luck",
+      "parent": "blazeandcave:end/the_end",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/monsters": {
+      "display_name": "Monsters",
+      "category": "monsters",
+      "base_xp": 10,
+      "difficulty": "easy",
+      "description": "Battle against the monsters of darkness",
+      "parent": null,
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/monster_hunter": {
+      "display_name": "Monster Hunter",
+      "category": "monsters",
+      "base_xp": 15,
+      "difficulty": "easy",
+      "description": "Kill any hostile monster",
+      "parent": "blazeandcave:monsters/monsters",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:enchanting/enchanting": {
+      "display_name": "Enchanting",
+      "category": "enchanting",
+      "base_xp": 10,
+      "difficulty": "easy",
+      "description": "Enchant items to give them magical abilities",
+      "parent": null,
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:enchanting/librarian": {
+      "display_name": "Librarian",
+      "category": "enchanting",
+      "base_xp": 20,
+      "difficulty": "easy",
+      "description": "Build some bookshelves for your enchanting table",
+      "parent": "blazeandcave:enchanting/enchanting",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:bookshelf:2"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:farming/farming": {
+      "display_name": "Farming",
+      "category": "farming",
+      "base_xp": 0,
+      "difficulty": "easy",
+      "description": "The world is full of delicious food",
+      "parent": null,
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:farming/a_seedy_place": {
+      "display_name": "A Seedy Place",
+      "category": "farming",
+      "base_xp": 10,
+      "difficulty": "easy",
+      "description": "Plant a seed and watch it grow",
+      "parent": "blazeandcave:farming/farming",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:wheat_seeds:4"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:biomes/biomes": {
+      "display_name": "Biomes",
+      "category": "biomes",
+      "base_xp": 0,
+      "difficulty": "easy",
+      "description": "All around the world!",
+      "parent": null,
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:biomes/for_you_my_sweet": {
+      "display_name": "For you, my sweet",
+      "category": "biomes",
+      "base_xp": 10,
+      "difficulty": "easy",
+      "description": "Pick a flower for someone special",
+      "parent": "blazeandcave:biomes/biomes",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:nether/nether": {
+      "display_name": "Nether",
+      "category": "nether",
+      "base_xp": 15,
+      "difficulty": "easy",
+      "description": "Bring summer clothes",
+      "parent": null,
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:nether/we_need_to_go_deeper": {
+      "display_name": "We Need to Go Deeper",
+      "category": "nether",
+      "base_xp": 25,
+      "difficulty": "medium",
+      "description": "Build, light and enter a Nether Portal",
+      "parent": "blazeandcave:nether/nether",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:potions/potions": {
+      "display_name": "Potions",
+      "category": "potions",
+      "base_xp": 10,
+      "difficulty": "easy",
+      "description": "Brewing and alchemy",
+      "parent": null,
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:redstone/redstone": {
+      "display_name": "Redstone",
+      "category": "redstone",
+      "base_xp": 10,
+      "difficulty": "easy",
+      "description": "Minecraft computing",
+      "parent": null,
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:statistics/statistics": {
+      "display_name": "Statistics",
+      "category": "statistics",
+      "base_xp": 5,
+      "difficulty": "easy",
+      "description": "Tracking your progress",
+      "parent": null,
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:super_challenges/challenges": {
+      "display_name": "Super Challenges",
+      "category": "super_challenges",
+      "base_xp": 100,
+      "difficulty": "insane",
+      "description": "The ultimate test of skill",
+      "parent": null,
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/dead_dont_die": {
+      "display_name": "Dead Don't Die",
+      "category": "monsters",
+      "base_xp": 20,
+      "difficulty": "easy",
+      "description": "Kill a zombie",
+      "parent": "blazeandcave:monsters/monster_hunter",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:rotten_flesh:3"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/there_has_to_be_another_way": {
+      "display_name": "There has to be another way...",
+      "category": "monsters",
+      "base_xp": 25,
+      "difficulty": "easy",
+      "description": "Kill a zombie villager",
+      "parent": "blazeandcave:monsters/dead_dont_die",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:rotten_flesh:3"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/iron_belly": {
+      "display_name": "Iron Belly",
+      "category": "monsters",
+      "base_xp": 30,
+      "difficulty": "easy",
+      "description": "Stop starvation using rotten flesh",
+      "parent": "blazeandcave:monsters/there_has_to_be_another_way",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/desert_nomad": {
+      "display_name": "Desert Nomad",
+      "category": "monsters",
+      "base_xp": 25,
+      "difficulty": "easy",
+      "description": "Kill a husk",
+      "parent": "blazeandcave:monsters/iron_belly",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/zombie_slayer": {
+      "display_name": "Zombie Slayer",
+      "category": "monsters",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Collect a stack of rotten flesh",
+      "parent": "blazeandcave:monsters/desert_nomad",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:rotten_flesh:8", "minecraft:enchanted_book:1"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/dead_really_dont_die": {
+      "display_name": "Dead Really Don't Die",
+      "category": "monsters",
+      "base_xp": 75,
+      "difficulty": "hard",
+      "description": "Give a zombie a Totem... so that you have to kill it twice",
+      "parent": "blazeandcave:monsters/zombie_slayer",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/freezing": {
+      "display_name": "Freezing",
+      "category": "monsters",
+      "base_xp": 100,
+      "difficulty": "hard",
+      "description": "Bring a husk to a tundra biome and then kill it",
+      "parent": "blazeandcave:monsters/dead_really_dont_die",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:sand:32", "minecraft:enchanted_book:1"],
+        "trophy": "vanilla_ice_cream"
+      }
+    },
+    "blazeandcave:monsters/still_talking": {
+      "display_name": "Still Talking",
+      "category": "monsters",
+      "base_xp": 250,
+      "difficulty": "extreme",
+      "description": "Blow up a zombie with a charged creeper to get a zombie head",
+      "parent": "blazeandcave:monsters/freezing",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/family_reunion": {
+      "display_name": "Family Reunion",
+      "category": "monsters",
+      "base_xp": 100,
+      "difficulty": "hard",
+      "description": "Reunite all zombie variants (and their baby forms) in one place",
+      "parent": "blazeandcave:monsters/still_talking",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:rotten_flesh:64"],
+        "trophy": "the_walking_head"
+      }
+    },
+    "blazeandcave:monsters/custom_boss_fight": {
+      "display_name": "Custom Boss Fight!",
+      "category": "monsters",
+      "base_xp": 100,
+      "difficulty": "hard",
+      "description": "Give a zombie full diamond armor and a diamond sword... then kill it",
+      "parent": "blazeandcave:monsters/family_reunion",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:diamond:9"],
+        "trophy": "hyperlink"
+      }
+    },
+    "blazeandcave:monsters/trick_or_treat": {
+      "display_name": "Trick or Treat!",
+      "category": "monsters",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Defeat a mob wearing a pumpkin",
+      "parent": "blazeandcave:monsters/custom_boss_fight",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:carved_pumpkin:8"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/handsome_jack": {
+      "display_name": "Handsome Jack",
+      "category": "monsters",
+      "base_xp": 100,
+      "difficulty": "hard",
+      "description": "Defeat a mob wearing a jack-o-lantern during Halloween",
+      "parent": "blazeandcave:monsters/trick_or_treat",
+      "hidden": true,
+      "rewards": {
+        "items": ["minecraft:jack_o_lantern:64"],
+        "trophy": "handsome_pumpkin"
+      }
+    },
+    "blazeandcave:monsters/a_watery_grave": {
+      "display_name": "A Watery Grave",
+      "category": "monsters",
+      "base_xp": 30,
+      "difficulty": "easy",
+      "description": "Defeat a Drowned in the briny depths. Gurgle",
+      "parent": "blazeandcave:monsters/monster_hunter",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/tridented_shield": {
+      "display_name": "Tridented Shield",
+      "category": "monsters",
+      "base_xp": 40,
+      "difficulty": "medium",
+      "description": "Block a trident thrown by a Drowned",
+      "parent": "blazeandcave:monsters/a_watery_grave",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/because_im_aquaman": {
+      "display_name": "Because I'm Aquaman!",
+      "category": "monsters",
+      "base_xp": 75,
+      "difficulty": "hard",
+      "description": "Obtain a trident from a Drowned",
+      "parent": "blazeandcave:monsters/tridented_shield",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/mollusc_man": {
+      "display_name": "Mollusc Man",
+      "category": "monsters",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Defeat a Drowned that is holding a nautilus shell",
+      "parent": "blazeandcave:monsters/because_im_aquaman",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:nautilus_shell:1"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/spooky_skeleton": {
+      "display_name": "Spooky Skeleton",
+      "category": "monsters",
+      "base_xp": 25,
+      "difficulty": "easy",
+      "description": "Kill a skeleton",
+      "parent": "blazeandcave:monsters/monster_hunter",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:bone:3", "minecraft:arrow:8"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/boned": {
+      "display_name": "Boned",
+      "category": "monsters",
+      "base_xp": 20,
+      "difficulty": "easy",
+      "description": "Grind up some bones into bone meal",
+      "parent": "blazeandcave:monsters/spooky_skeleton",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:bone_meal:8"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/not_today_thank_you": {
+      "display_name": "Not Today, Thank You",
+      "category": "monsters",
+      "base_xp": 30,
+      "difficulty": "medium",
+      "description": "Deflect an arrow with a shield",
+      "parent": "blazeandcave:monsters/boned",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/skeleton_smiter": {
+      "display_name": "Skeleton Smiter",
+      "category": "monsters",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Collect a stack of bones",
+      "parent": "blazeandcave:monsters/not_today_thank_you",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:bone:8", "minecraft:arrow:16", "minecraft:enchanted_book:1"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/ew_ew_ew": {
+      "display_name": "Ew Ew Ew",
+      "category": "monsters",
+      "base_xp": 25,
+      "difficulty": "easy",
+      "description": "Kill a spider",
+      "parent": "blazeandcave:monsters/monster_hunter",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:string:3"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/poisonous_ew": {
+      "display_name": "Poisonous Ew",
+      "category": "monsters",
+      "base_xp": 30,
+      "difficulty": "medium",
+      "description": "Kill a cave spider",
+      "parent": "blazeandcave:monsters/ew_ew_ew",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:string:3", "minecraft:spider_eye:1"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:monsters/spider_smasher": {
+      "display_name": "Spider Smasher",
+      "category": "monsters",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Collect a stack of string from spiders or cobwebs",
+      "parent": "blazeandcave:monsters/poisonous_ew",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:string:8", "minecraft:spider_eye:3", "minecraft:enchanted_book:1"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:enchanting/magical_stockpile": {
+      "display_name": "Magical Stockpile",
+      "category": "enchanting",
+      "base_xp": 100,
+      "difficulty": "hard",
+      "description": "Obtain a full stack of bottles of enchanting",
+      "parent": "blazeandcave:enchanting/librarian",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:enchanting/bow_down_to_me": {
+      "display_name": "Bow down to me!",
+      "category": "enchanting",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Obtain Power V",
+      "parent": "blazeandcave:enchanting/librarian",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:lapis_lazuli:12"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:enchanting/to_infinity_and_beyond": {
+      "display_name": "To Infinity And Beyond!",
+      "category": "enchanting",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Obtain Infinity on a bow",
+      "parent": "blazeandcave:enchanting/bow_down_to_me",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:lapis_lazuli:12"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:enchanting/super_efficient": {
+      "display_name": "Super Efficient",
+      "category": "enchanting",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Obtain Efficiency V",
+      "parent": "blazeandcave:enchanting/librarian",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:lapis_lazuli:12"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:enchanting/fortunate_son": {
+      "display_name": "Fortunate Son",
+      "category": "enchanting",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Obtain Fortune III",
+      "parent": "blazeandcave:enchanting/super_efficient",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:lapis_lazuli:12"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:enchanting/pick_like_silk": {
+      "display_name": "Pick Like Silk",
+      "category": "enchanting",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Use a Silk Touch enchanted pickaxe to obtain diamond ore as a block",
+      "parent": "blazeandcave:enchanting/fortunate_son",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:diamond:2"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:enchanting/needle_sharp": {
+      "display_name": "Needle Sharp",
+      "category": "enchanting",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Obtain Sharpness V",
+      "parent": "blazeandcave:enchanting/librarian",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:lapis_lazuli:12"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:enchanting/undead_slayer": {
+      "display_name": "Undead Slayer",
+      "category": "enchanting",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Obtain Smite V",
+      "parent": "blazeandcave:enchanting/needle_sharp",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:lapis_lazuli:12"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:enchanting/bane_of_one_shotting_spiders": {
+      "display_name": "Bane of one-shotting spiders",
+      "category": "enchanting",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Obtain Bane of Arthropods V",
+      "parent": "blazeandcave:enchanting/undead_slayer",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:lapis_lazuli:12"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:enchanting/newtons_flaming_laser_sword": {
+      "display_name": "Newton's Flaming Laser Sword",
+      "category": "enchanting",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Have a diamond sword with Fire Aspect II",
+      "parent": "blazeandcave:enchanting/bane_of_one_shotting_spiders",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:diamond:4"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:enchanting/a_rather_pointy_fence_post": {
+      "display_name": "A rather pointy fence post",
+      "category": "enchanting",
+      "base_xp": 100,
+      "difficulty": "hard",
+      "description": "Enchant a wooden sword with Sharpness V",
+      "parent": "blazeandcave:enchanting/newtons_flaming_laser_sword",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:oak_fence:64"],
+        "trophy": "fence_post"
+      }
+    },
+    "blazeandcave:enchanting/overkill": {
+      "display_name": "Overkill",
+      "category": "enchanting",
+      "base_xp": 60,
+      "difficulty": "hard",
+      "description": "Deal eight hearts of damage in a single melee blow without using a Mace",
+      "parent": "blazeandcave:enchanting/a_rather_pointy_fence_post",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:enchanting/over_overkill": {
+      "display_name": "Over-Overkill",
+      "category": "enchanting",
+      "base_xp": 100,
+      "difficulty": "extreme",
+      "description": "Deal 16 hearts of damage in a single melee blow without using a Mace",
+      "parent": "blazeandcave:enchanting/overkill",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": "one_punch_mans_fist"
+      }
+    },
+    "blazeandcave:enchanting/shotbow": {
+      "display_name": "Shotbow",
+      "category": "enchanting",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Shoot three arrows at once with a crossbow",
+      "parent": "blazeandcave:enchanting/to_infinity_and_beyond",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:lapis_lazuli:12"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:enchanting/machine_bow": {
+      "display_name": "Machine Bow",
+      "category": "enchanting",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Fire a crossbow as rapidly as possible",
+      "parent": "blazeandcave:enchanting/shotbow",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:lapis_lazuli:12"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:enchanting/arbalistic": {
+      "display_name": "Arbalistic",
+      "category": "enchanting",
+      "base_xp": 85,
+      "difficulty": "hard",
+      "description": "Kill five unique mobs with one crossbow shot",
+      "parent": "blazeandcave:enchanting/machine_bow",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": "finger_guns"
+      }
+    },
+    "blazeandcave:enchanting/boomerang": {
+      "display_name": "Boomerang",
+      "category": "enchanting",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Turn your trident into a boomerang by getting Loyalty on it",
+      "parent": "blazeandcave:enchanting/librarian",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:lapis_lazuli:12"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:enchanting/do_a_barrel_roll": {
+      "display_name": "Do A Barrel Roll",
+      "category": "enchanting",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Use Riptide to give yourself a boost",
+      "parent": "blazeandcave:enchanting/boomerang",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:lapis_lazuli:12"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:enchanting/zeus": {
+      "display_name": "Zeus",
+      "category": "enchanting",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Obtain Channeling on a trident",
+      "parent": "blazeandcave:enchanting/do_a_barrel_roll",
+      "hidden": false,
+      "rewards": {
+        "items": ["minecraft:lapis_lazuli:12"],
+        "trophy": null
+      }
+    },
+    "blazeandcave:enchanting/very_very_frightening": {
+      "display_name": "Very Very Frightening",
+      "category": "enchanting",
+      "base_xp": 100,
+      "difficulty": "hard",
+      "description": "Strike a Villager with lightning",
+      "parent": "blazeandcave:enchanting/zeus",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    },
+    "blazeandcave:enchanting/mace_windu": {
+      "display_name": "Mace Windu",
+      "category": "enchanting",
+      "base_xp": 50,
+      "difficulty": "medium",
+      "description": "Obtain the Wind Burst enchantment on a Mace",
+      "parent": "blazeandcave:enchanting/zeus",
+      "hidden": false,
+      "rewards": {
+        "items": [],
+        "trophy": null
+      }
+    }
+  },
+  "special_conditions": {
+    "rate_limiting": {
+      "enabled": true,
+      "max_per_minute": 5,
+      "max_per_hour": 30,
+      "max_per_day": 200,
+      "cooldown_seconds": 10
+    },
+    "bonus_conditions": {
+      "first_time_bonus": 1.5,
+      "hardcore_world_bonus": 2.0,
+      "terralith_biome_bonus": 1.5,
+      "group_achievement_bonus": 1.2
+    },
+    "item_rewards": {
+      "enabled": true,
+      "delivery_method": "inventory_or_drop",
+      "stack_limits": true
+    },
+    "trophy_rewards": {
+      "enabled": true,
+      "delivery_method": "special_container",
+      "announcement": true
+    }
+  },
+  "advancement_patterns": {
+    "namespace_prefixes": [
+      "blazeandcave:adventure/",
+      "blazeandcave:animals/",
+      "blazeandcave:biomes/",
+      "blazeandcave:building/",
+      "blazeandcave:enchanting/",
+      "blazeandcave:end/",
+      "blazeandcave:farming/",
+      "blazeandcave:mining/",
+      "blazeandcave:monsters/",
+      "blazeandcave:nether/",
+      "blazeandcave:potions/",
+      "blazeandcave:redstone/",
+      "blazeandcave:statistics/",
+      "blazeandcave:challenges/",
+      "blazeandcave:terralith/",
+      "blazeandcave:weaponry/"
+    ],
+    "default_category_mapping": {
+      "adventure": "adventure",
+      "animals": "animals",
+      "biomes": "biomes",
+      "building": "building",
+      "enchanting": "enchanting",
+      "end": "end",
+      "farming": "farming",
+      "mining": "mining",
+      "monsters": "monsters",
+      "nether": "nether",
+      "potions": "potions",
+      "redstone": "redstone",
+      "statistics": "statistics",
+      "challenges": "super_challenges",
+      "terralith": "terralith",
+      "weaponry": "weaponry"
+    }
+  },
+  "xp_calculation": {
+    "formula": "base_xp * difficulty_multiplier * category_multiplier * bonus_conditions",
+    "minimum_xp": 5,
+    "maximum_xp": 10000,
+    "playtime_factor": false,
+    "group_completion_bonus": true
+  },
+  "utility_functions": {
+    "getXPForAchievement": {
+      "description": "Calculate final XP value for an achievement",
+      "parameters": ["achievement_id", "player_context", "bonus_modifiers"],
+      "returns": "integer XP value"
+    },
+    "getRewardsForAchievement": {
+      "description": "Get item and trophy rewards for an achievement",
+      "parameters": ["achievement_id"],
+      "returns": "reward object with items and trophies"
+    },
+    "isAchievementRateLimited": {
+      "description": "Check if player is rate limited for achievement XP",
+      "parameters": ["player_uuid", "current_time"],
+      "returns": "boolean rate limit status"
+    },
+    "getCategoryProgress": {
+      "description": "Get player progress in a specific category",
+      "parameters": ["player_uuid", "category"],
+      "returns": "progress object with completed achievements"
+    }
+  },
+  "event_handlers": {
+    "on_achievement_complete": {
+      "actions": [
+        "calculate_xp",
+        "apply_rate_limiting",
+        "grant_rewards",
+        "check_parent_chain",
+        "update_player_stats",
+        "broadcast_announcement"
+      ]
+    },
+    "on_xp_grant": {
+      "actions": [
+        "validate_amount",
+        "check_multipliers",
+        "update_database",
+        "trigger_rank_check",
+        "send_notification"
+      ]
+    },
+    "on_reward_grant": {
+      "actions": [
+        "validate_inventory_space",
+        "deliver_items",
+        "place_trophy",
+        "log_reward_delivery"
+      ]
+    }
+  }
+}

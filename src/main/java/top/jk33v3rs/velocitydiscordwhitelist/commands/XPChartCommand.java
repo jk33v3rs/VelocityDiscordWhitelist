@@ -159,50 +159,52 @@ public class XPChartCommand {
      * Shows rank requirements and progression thresholds
      * 
      * @param player The player to show rank requirements to
-     */
-    private void showRankRequirements(Player player) {
+     */    private void showRankRequirements(Player player) {
         Component header = Component.text("═══ Rank Requirements Chart ═══", NamedTextColor.GOLD, TextDecoration.BOLD);
         player.sendMessage(header);
         
         player.sendMessage(Component.text(""));
         player.sendMessage(Component.text("🏅 Rank Progression System:", NamedTextColor.YELLOW, TextDecoration.BOLD));
-        player.sendMessage(Component.text("Ranks have main levels (1-10) and sub-ranks (1-5)", NamedTextColor.WHITE));
+        player.sendMessage(Component.text("Ranks have 25 main levels and 7 sub-ranks", NamedTextColor.WHITE));
         player.sendMessage(Component.text("Progress through sub-ranks before advancing to next main rank", NamedTextColor.GRAY));
         
         player.sendMessage(Component.text(""));
         player.sendMessage(Component.text("📈 Sample Rank Structure:", NamedTextColor.YELLOW, TextDecoration.BOLD));
         
-        // Main Rank 1 - Bystander
+        // Main Rank 1 - Bystander (using correct canonical system)
         player.sendMessage(Component.text("Rank 1 - Bystander:", NamedTextColor.GREEN, TextDecoration.BOLD));
-        player.sendMessage(Component.text("  1.1 Novice: ", NamedTextColor.WHITE)
-            .append(Component.text("0 XP, 0 minutes", NamedTextColor.GRAY)));
-        player.sendMessage(Component.text("  1.2 Learner: ", NamedTextColor.WHITE)
-            .append(Component.text("50 XP, 60 minutes", NamedTextColor.GRAY)));
-        player.sendMessage(Component.text("  1.3 Explorer: ", NamedTextColor.WHITE)
-            .append(Component.text("150 XP, 180 minutes", NamedTextColor.GRAY)));
-        player.sendMessage(Component.text("  1.4 Adventurer: ", NamedTextColor.WHITE)
-            .append(Component.text("300 XP, 360 minutes", NamedTextColor.GRAY)));
-        player.sendMessage(Component.text("  1.5 Veteran: ", NamedTextColor.WHITE)
-            .append(Component.text("500 XP, 600 minutes", NamedTextColor.GRAY)));
+        player.sendMessage(Component.text("  1.1 novice bystander: ", NamedTextColor.WHITE)
+            .append(Component.text("Starting rank", NamedTextColor.GRAY)));
+        player.sendMessage(Component.text("  1.2 apprentice bystander: ", NamedTextColor.WHITE)
+            .append(Component.text("Basic progression", NamedTextColor.GRAY)));
+        player.sendMessage(Component.text("  1.3 adept bystander: ", NamedTextColor.WHITE)
+            .append(Component.text("Continued progress", NamedTextColor.GRAY)));
+        player.sendMessage(Component.text("  1.4 master bystander: ", NamedTextColor.WHITE)
+            .append(Component.text("Mid-tier progress", NamedTextColor.GRAY)));
+        player.sendMessage(Component.text("  1.5 heroic bystander: ", NamedTextColor.WHITE)
+            .append(Component.text("Advanced progress", NamedTextColor.GRAY)));
+        player.sendMessage(Component.text("  1.6 mythic bystander: ", NamedTextColor.WHITE)
+            .append(Component.text("High-tier progress", NamedTextColor.GRAY)));
+        player.sendMessage(Component.text("  1.7 immortal bystander: ", NamedTextColor.WHITE)
+            .append(Component.text("Ready for next main rank", NamedTextColor.GRAY)));
         
-        // Main Rank 2 - Member
-        player.sendMessage(Component.text("Rank 2 - Member:", NamedTextColor.YELLOW, TextDecoration.BOLD));
-        player.sendMessage(Component.text("  2.1 Junior: ", NamedTextColor.WHITE)
-            .append(Component.text("750 XP, 900 minutes", NamedTextColor.GRAY)));
-        player.sendMessage(Component.text("  2.2 Regular: ", NamedTextColor.WHITE)
-            .append(Component.text("1000 XP, 1200 minutes", NamedTextColor.GRAY)));
-        player.sendMessage(Component.text("  2.3 Senior: ", NamedTextColor.WHITE)
-            .append(Component.text("1500 XP, 1800 minutes", NamedTextColor.GRAY)));
-        player.sendMessage(Component.text("  2.4 Expert: ", NamedTextColor.WHITE)
-            .append(Component.text("2000 XP, 2400 minutes", NamedTextColor.GRAY)));
-        player.sendMessage(Component.text("  2.5 Master: ", NamedTextColor.WHITE)
-            .append(Component.text("2750 XP, 3000 minutes", NamedTextColor.GRAY)));
+        // Main Rank 2 - Onlooker
+        player.sendMessage(Component.text("Rank 2 - Onlooker:", NamedTextColor.YELLOW, TextDecoration.BOLD));
+        player.sendMessage(Component.text("  2.1 novice onlooker: ", NamedTextColor.WHITE)
+            .append(Component.text("Second main rank achieved", NamedTextColor.GRAY)));
+        player.sendMessage(Component.text("  ... (continues through immortal onlooker)", NamedTextColor.GRAY));
         
-        // Higher ranks preview
-        player.sendMessage(Component.text("Ranks 3-5: ", NamedTextColor.GOLD)
-            .append(Component.text("Trusted, Elite, Legend", NamedTextColor.WHITE)));
-        player.sendMessage(Component.text("Ranks 6-10: ", NamedTextColor.LIGHT_PURPLE)
-            .append(Component.text("Hero, Champion, Mythic, Divine, Transcendent", NamedTextColor.WHITE)));
+        // Higher ranks preview using correct canonical names
+        player.sendMessage(Component.text("Ranks 3-7: ", NamedTextColor.GOLD)
+            .append(Component.text("wanderer, traveller, explorer, adventurer, surveyor", NamedTextColor.WHITE)));
+        player.sendMessage(Component.text("Ranks 8-12: ", NamedTextColor.AQUA)
+            .append(Component.text("navigator, journeyman, pathfinder, trailblazer, pioneer", NamedTextColor.WHITE)));
+        player.sendMessage(Component.text("Ranks 13-17: ", NamedTextColor.BLUE)
+            .append(Component.text("craftsman, specialist, artisan, veteran, sage", NamedTextColor.WHITE)));
+        player.sendMessage(Component.text("Ranks 18-22: ", NamedTextColor.DARK_PURPLE)
+            .append(Component.text("luminary, titan, legend, eternal, ascendant", NamedTextColor.WHITE)));
+        player.sendMessage(Component.text("Ranks 23-25: ", NamedTextColor.LIGHT_PURPLE)
+            .append(Component.text("celestial, divine, deity", NamedTextColor.WHITE)));
         
         player.sendMessage(Component.text(""));
         player.sendMessage(Component.text("📊 Requirements combine:", NamedTextColor.YELLOW, TextDecoration.BOLD));

@@ -1,0 +1,37 @@
+# VelocityDiscordWhitelist Simple Configuration
+# Inspired by Spicord's minimal configuration approach
+
+# Database Configuration
+database:
+  host: "localhost"
+  port: 3306
+  database: "discord_whitelist"
+  username: "root"
+  password: "password"
+
+# Discord Bot Configuration  
+discord:
+  enabled: true
+  token: "YOUR_BOT_TOKEN"
+  guild_id: "YOUR_GUILD_ID" 
+  verification_channel: "CHANNEL_ID"
+  roles:
+    admin: "987654321098765432"
+    verified: "765432109876543210"
+
+# Basic Settings
+settings:
+  debug: false
+  session_timeout_minutes: 30
+  max_verification_attempts: 3
+  purgatory_server: "lobby"
+
+# Geyser Support (Bedrock Edition)
+geyser:
+  enabled: false
+  prefix: "."
+
+# LuckPerms Integration
+luckperms:
+  enabled: false
+  default_group: "verified"

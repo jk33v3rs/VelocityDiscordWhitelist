@@ -16,6 +16,7 @@ import top.jk33v3rs.velocitydiscordwhitelist.models.BlazeAndCavesAdvancement;
 import top.jk33v3rs.velocitydiscordwhitelist.models.XPEvent;
 import top.jk33v3rs.velocitydiscordwhitelist.utils.LoggingUtils;
 import top.jk33v3rs.velocitydiscordwhitelist.utils.ExceptionHandler;
+import top.jk33v3rs.velocitydiscordwhitelist.integrations.blazeandcaves.BlazeAndCavesLoader;
 
 /**
  * XPManager handles XP operations with rate limiting to prevent XP farming.
@@ -282,9 +283,8 @@ public class XPManager {
         // Update event count
         eventCounts.merge(rateLimitKey, 1, Integer::sum);
     }
-    
-    /**
-     * Initializes BlazeAndCaves advancement mappings
+      /**
+     * Initializes BlazeAndCaves advancement mappings from JSON configuration
      */
     private void initializeBlazeAndCavesMappings() {
         if (!blazeAndCavesEnabled) {
@@ -292,7 +292,31 @@ public class XPManager {
             return;
         }
         
-        // Sample BlazeAndCaves advancements - this would typically be loaded from a config file
+        try {
+            // Try to load achievements from JSON file
+            Map<String, BlazeAndCavesAdvancement> loadedAchievements = 
+                BlazeAndCavesLoader.loadAchievements(java.nio.file.Paths.get("."));
+            
+            if (!loadedAchievements.isEmpty()) {
+                blazeAndCavesMap.putAll(loadedAchievements);
+                debugLog("Loaded " + loadedAchievements.size() + " BlazeAndCaves achievements from JSON configuration");
+            } else {
+                // Fallback to hardcoded sample achievements if JSON file not found
+                initializeDefaultAchievements();
+                debugLog("Loaded " + blazeAndCavesMap.size() + " default BlazeAndCaves achievement mappings (JSON not found)");
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to load BlazeAndCaves achievements from JSON, using defaults: " + e.getMessage());
+            initializeDefaultAchievements();
+            debugLog("Loaded " + blazeAndCavesMap.size() + " default BlazeAndCaves achievement mappings (JSON load failed)");
+        }
+    }
+    
+    /**
+     * Initializes default BlazeAndCaves advancement mappings as fallback
+     */
+    private void initializeDefaultAchievements() {
+        // Sample BlazeAndCaves advancements - fallback when JSON is not available
         blazeAndCavesMap.put("blazeandcave:overworld/get_wood", 
             new BlazeAndCavesAdvancement("blazeandcave:overworld/get_wood", "Getting Wood", 
                                        "overworld", 10, false, false, "easy", "Get wood"));
@@ -322,9 +346,7 @@ public class XPManager {
         blazeAndCavesMap.put("blazeandcave:hardcore/survive_nights", 
             new BlazeAndCavesAdvancement("blazeandcave:hardcore/survive_nights", "Night Survivor", 
                                        "hardcore", 40, false, true, "hard", "Survive nights in hardcore"));
-        
-        debugLog("Initialized " + blazeAndCavesMap.size() + " BlazeAndCaves advancement mappings");
-    }    /**
+    }/**
      * Gets recent XP events for a player
      * 
      * @param playerUuid The UUID of the player
